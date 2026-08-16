@@ -32,6 +32,13 @@ from .entity import Htp1Entity
 
 PARALLEL_UPDATES = 0
 
+# What the video sensors say when the unit reports no picture on the selected input.
+#
+# Note this is the same state whether nothing is plugged in or a connected source has simply
+# gone to sleep — the processor cannot tell those apart and neither can we. Named here so the
+# wording is a one-line change.
+NO_SIGNAL = "No Input Connected"
+
 
 @dataclass(frozen=True, kw_only=True)
 class Htp1SensorDescription(SensorEntityDescription):
@@ -53,6 +60,15 @@ class Htp1SensorDescription(SensorEntityDescription):
     # Left None everywhere else on purpose. Inventing a value for a field the unit declined to
     # report would be guessing, and this is the one place where the absence has a name.
     empty_means: str | None = None
+    # What to say when the unit reports no video signal at all.
+    #
+    # `unknown` is technically true but reads like a fault, and on a processor with nothing
+    # plugged into the selected input it is a permanent state rather than a transient one. The
+    # video sensors say so in words instead.
+    #
+    # Deliberately not applied to the audio sensors: those are blanked when the unit is off, and
+    # a processor decoding nothing is a different situation from one with no picture.
+    no_signal_means: str | None = None
 
 
 SENSORS: tuple[Htp1SensorDescription, ...] = (
@@ -111,6 +127,7 @@ SENSORS: tuple[Htp1SensorDescription, ...] = (
         translation_key="video_resolution",
         field="video_resolution",
         entity_category=EntityCategory.DIAGNOSTIC,
+        no_signal_means=NO_SIGNAL,
     ),
     Htp1SensorDescription(
         key="hdr_status",
@@ -121,6 +138,7 @@ SENSORS: tuple[Htp1SensorDescription, ...] = (
         # here while carrying a real 720p60Hz signal, one showed `HDR10`, and the one with no
         # signal at all showed `--`.
         empty_means="SDR",
+        no_signal_means=NO_SIGNAL,
     ),
     Htp1SensorDescription(
         key="video_color_space",
@@ -174,6 +192,10 @@ class Htp1Sensor(Htp1Entity, SensorEntity):
         An **empty** string is a third thing, and treating it as a fourth spelling of the second
         was a defect: it means the unit has a signal but this attribute does not apply to it.
         For most fields that is still unknown. For HDR it is SDR — see `empty_means`.
+
+        The video sensors then name the no-signal case rather than reporting `unknown`, which on
+        an input with nothing on it is a permanent state that reads like a fault. Power is still
+        checked first: a sleeping processor is off, not unplugged, and must not claim otherwise.
         """
         # `is False` and not a falsy test: a firmware that never reports power must not blank
         # every sensor it does report.
@@ -182,9 +204,14 @@ class Htp1Sensor(Htp1Entity, SensorEntity):
         value = self.coordinator.mirror.get(self.entity_description.field)
         if not isinstance(value, str) or value.strip(" -"):
             return value
-        if value == "" and self.entity_description.empty_means and self._video_signal_present():
-            return self.entity_description.empty_means
-        return None
+
+        description = self.entity_description
+        if self._video_signal_present():
+            # Blank despite a picture: only HDR has a name for that.
+            if value == "" and description.empty_means:
+                return description.empty_means
+            return None
+        return description.no_signal_means
 
     def _video_signal_present(self) -> bool:
         """Is the unit seeing a picture at all?

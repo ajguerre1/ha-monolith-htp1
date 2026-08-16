@@ -18,6 +18,8 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.ha_monolith_htp1.sensor import NO_SIGNAL
+
 PATCH_CLIENT = "custom_components.ha_monolith_htp1.Htp1Client"
 
 # What a firmware 2.x unit produces. Ten of these are created from the modern fixture; the
@@ -349,18 +351,71 @@ async def test_no_picture_at_all_is_not_reported_as_sdr(hass, config_entry, mock
     _push(hass, mock_client, {"video_resolution", "hdr_status"})
     await hass.async_block_till_done()
 
-    assert hass.states.get("sensor.test_processor_hdr").state == STATE_UNKNOWN
+    assert hass.states.get("sensor.test_processor_hdr").state != "SDR"
 
 
-async def test_dashes_in_hdr_are_still_no_reading(hass, config_entry, mock_client):
-    """The no-signal spelling keeps its old meaning; only the empty case changed."""
+async def test_no_signal_is_named_rather_than_left_unknown(hass, config_entry, mock_client):
+    """`unknown` on an input with nothing on it reads like a fault. It is a steady state.
+
+    Both video sensors say so in the same words, so a card showing them together does not
+    describe one situation in two different ways.
+    """
     await _setup(hass, config_entry, mock_client)
 
-    mock_client.mirror.apply_ops([{"op": "replace", "path": "/videostat/HDRstatus", "value": "--"}])
-    _push(hass, mock_client, {"hdr_status"})
+    mock_client.mirror.apply_ops(
+        [
+            {"op": "replace", "path": "/videostat/VideoResolution", "value": "-----"},
+            {"op": "replace", "path": "/videostat/HDRstatus", "value": "--"},
+        ]
+    )
+    _push(hass, mock_client, {"video_resolution", "hdr_status"})
     await hass.async_block_till_done()
 
+    assert hass.states.get("sensor.test_processor_video_resolution").state == NO_SIGNAL
+    assert hass.states.get("sensor.test_processor_hdr").state == NO_SIGNAL
+
+
+async def test_a_sleeping_unit_does_not_claim_the_input_is_unplugged(
+    hass, config_entry, mock_client
+):
+    """Off and unplugged are different things, and power is checked first.
+
+    Announcing "No Input Connected" for a sleeping processor would be a confident statement
+    about the cabling, made on no evidence at all.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops(
+        [
+            {"op": "replace", "path": "/videostat/VideoResolution", "value": "-----"},
+            {"op": "replace", "path": "/powerIsOn", "value": False},
+        ]
+    )
+    _push(hass, mock_client, {"video_resolution", "power"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_video_resolution").state == STATE_UNKNOWN
     assert hass.states.get("sensor.test_processor_hdr").state == STATE_UNKNOWN
+
+
+async def test_the_audio_sensors_never_mention_the_input(hass, config_entry, mock_client):
+    """Only the video sensors got a name for no signal.
+
+    A processor decoding nothing is not the same situation as one with no picture, and an audio
+    reading has no business speculating about a video cable.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops(
+        [
+            {"op": "replace", "path": "/videostat/VideoResolution", "value": "-----"},
+            {"op": "replace", "path": "/status/SurroundMode", "value": "--"},
+        ]
+    )
+    _push(hass, mock_client, {"video_resolution", "surround_mode"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_surround_mode").state == STATE_UNKNOWN
 
 
 async def test_other_video_fields_do_not_invent_a_value(hass, config_entry, mock_client):
