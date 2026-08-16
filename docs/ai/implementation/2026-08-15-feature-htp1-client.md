@@ -15,7 +15,7 @@ in the planning doc.
 |---|---|---|
 | T1 fixtures and test harness | **done** | 20 tests pass on Windows with Home Assistant absent; ruff check + format clean |
 | T2 `protocol.py` | **done** | 34 protocol tests + 2 package-hygiene tests; 56 total green; ruff clean |
-| T3 `models.py` | todo | |
+| T3 `models.py` | **done** | 47 tests; 103 total green. A failing test found a floating-point tie defect — see below |
 | T4 `mso.py` | todo | |
 | T5 client: transport | todo | |
 | T6 client: read path | todo | |
@@ -118,6 +118,50 @@ let an unrelated payload wipe the mirror.
 **`encode_change` raises rather than emitting anything questionable** — empty arrays and any
 op that is not `replace`. Both are refusals to send, not runtime checks on incoming data: the
 caller has the bug, and the consequence lands on a live processor.
+
+### T3 — `models.py`
+
+**The floating-point tie defect, found by a failing test rather than by review.**
+
+The volume map was written exactly as designed — unrounded fraction out, half-down rounding
+back to integer dB — and `test_ties_round_down_never_up` still failed, on 55%.
+
+`0.55 * 50` is `27.499999999999996`, not `27.5`. So an input that is *mathematically* the tie
+−22.5 dB arrives a hair above it, is no longer a tie, and rounds to −22: **one dB louder than
+requested**, which is the single direction the tie rule exists to forbid.
+
+`fraction_to_db` now snaps the intermediate to nine decimal places before rounding. Measured
+across five plausible ranges rather than assumed:
+
+| Range | Exact ties | Wrong without the snap |
+|---|---|---|
+| −50..0 | 50 | **1** (55%) |
+| −80..+10 | 10 | **1** |
+| −90..0 | 10 | **1** |
+| −127..0 | 1 | 0 |
+| −60..−5 | 5 | 0 |
+
+So it is rare, not widespread — my first instinct was that half of all ties would be affected,
+and that was wrong. It is still worth the guard: which input is hit depends on the range,
+`vpl`/`vph` are user-configurable per unit, and the error is always in the louder direction.
+
+**The test was wrong too, and in the same way.** It detected ties with `math.isclose` but
+asserted with `math.floor` of the float — tolerant detection, intolerant assertion. It now uses
+`fractions.Fraction`, so a tie is identified exactly rather than approximately. Asking a float
+whether it is a tie gets the wrong answer for precisely the inputs the test is about.
+
+**Codecs are stateless.** They decode either wire shape and `matches()` reports which one
+actually arrived. That is the HW-02 insurance: `/eq/tc` is declared boolean but unmeasured, and
+a wrong declaration degrades to a log line rather than to a switch that silently does nothing.
+The warn-once reporting lives in the mirror (T4), not here — a flag on a module-level codec
+instance would suppress the warning across all five units after the first.
+
+`decode` returns `None` for anything unreadable. Unreadable is not `False`: a control whose
+value is unknown must report unknown rather than quietly claim to be off.
+
+**Deferred deliberately.** The design lists `source_options`, `sound_mode_options` and
+`dirac_slot_options` under `models.py`. They consume collections the mirror builds, so they
+land with T4 rather than being designed here against a data shape that does not exist yet.
 
 ### Patterns
 

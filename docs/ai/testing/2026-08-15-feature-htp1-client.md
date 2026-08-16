@@ -83,24 +83,59 @@ sharper. 34 tests.
 - [x] `test_normalise_ops_accepts_both_shapes` — parametrised: array, single op, multi, empty
 - [x] `test_normalise_ops_rejects_anything_that_is_not_operations` — parametrised over 7 shapes
 
-### `models.py` — value semantics
+### `models.py` — value semantics (T3) — **complete**
 
-- [ ] `test_every_db_survives_a_round_trip` — **the highest-value test in the suite**. For every
-      integer dB across `(-50, 0)`, `(-80, 10)`, `(-127, 0)` and the degenerate `vph <= vpl`,
-      `fraction_to_db(db_to_fraction(db)) == db` (AC-03). The `(-127, 0)` case is the one that
-      matters: it has 128 dB values, so it fails outright if the fraction is ever rounded to an
-      integer percentage — 27 failures, the first returning one dB *louder* than requested
-- [ ] `test_the_fraction_is_never_quantised` — asserts `db_to_fraction` returns values a
-      101-step percentage could not represent. This is the regression guard for Q4: it fails
-      the moment someone "restores" the Control4 driver's `dbToPercent` behaviour
-- [ ] `test_ties_round_down_never_up` — every exact `.5` input to `fraction_to_db`, both signs
-      (AC-04)
-- [ ] `test_round_half_down_is_not_bankers_rounding` — pins the difference from `round()`
+47 tests.
+
+*Rounding*
+- [x] `test_round_half_down_sends_every_tie_downward` — parametrised, both signs
+- [x] `test_round_half_down_is_not_bankers_rounding` — pins the difference from `round()`
       explicitly, so a future "simplification" fails here
-- [ ] `test_a_degenerate_volume_range_does_not_divide_by_zero`
-- [ ] `test_values_outside_the_range_are_clamped`
-- [ ] `test_bool_codec_and_on_off_string_codec_round_trip`
-- [ ] `test_a_codec_mismatch_is_reported_once` — declared bool, observed `"on"` (guards HW-02)
+
+*The volume map*
+- [x] `test_every_db_survives_a_round_trip` — **the highest-value test in the suite**. Every
+      integer dB across `(-50, 0)`, `(-80, 10)`, `(-127, 0)` (AC-03). The `(-127, 0)` case is
+      the one that matters: 128 dB values cannot survive a 101-step percentage
+- [x] `test_the_fraction_is_never_quantised` — the regression guard for Q4; fails the moment
+      someone restores the Control4 `dbToPercent` behaviour
+- [x] `test_the_fraction_is_a_float_between_zero_and_one`
+- [x] `test_the_endpoints_map_to_zero_and_one`
+- [x] `test_ties_round_down_never_up` (AC-04) — ties identified with `Fraction`, not floats,
+      because asking a float whether it is a tie gets the wrong answer for exactly these inputs
+- [x] `test_a_tie_arriving_with_floating_point_error_still_rounds_down` — **added during
+      implementation**; see below
+- [x] `test_values_outside_the_range_are_clamped`
+- [x] `test_a_degenerate_volume_range_does_not_divide_by_zero` — parametrised over four
+      nonsense ranges
+- [x] `test_fractional_range_bounds_stay_inside_the_device_range` — `vpl`/`vph` need not be
+      whole numbers; the result must still be an integer inside the reported range
+
+*Codecs*
+- [x] `test_the_boolean_codec_round_trips`
+- [x] `test_the_on_off_string_codec_round_trips`
+- [x] `test_each_codec_tolerates_the_other_wire_shape` — HW-02 insurance
+- [x] `test_a_codec_returns_none_for_a_value_it_cannot_read` — unreadable is not `False`; a
+      control must go unknown rather than silently claim to be off
+- [x] `test_a_codec_can_tell_whether_the_wire_shape_matched_its_declaration`
+
+*Versions*
+- [x] `test_the_av_controller_version_is_reduced_to_its_number`
+- [x] `test_the_system_version_is_the_one_the_unit_calls_itself`
+- [x] `test_version_normalisers_tolerate_absence`
+
+> **New scenario found by a failing test.** `test_ties_round_down_never_up` failed on 55%:
+> `0.55 * 50` is `27.499999999999996`, so an input that is mathematically the tie −22.5 dB
+> arrives just above it and rounds **up**, one dB louder — the one direction the tie rule
+> forbids. `fraction_to_db` now snaps to nine decimal places before rounding.
+> Measured across five plausible ranges: one input affected on three of them, none on the other
+> two. Rare, but the affected input depends on the range, `vpl`/`vph` are user-configurable,
+> and the error is always louder.
+
+> **Scenario moved.** `test_a_codec_mismatch_is_reported_once` belongs to the mirror (T4), not
+> here: the codecs are stateless by design, and "report once" is state. Keeping a warn-once
+> flag on a module-level codec instance would suppress the warning across all five units after
+> the first. `test_a_codec_can_tell_whether_the_wire_shape_matched_its_declaration` covers the
+> detection half here; T4 covers the reporting half.
 
 ### `mso.py` — mirror and patch applier
 
