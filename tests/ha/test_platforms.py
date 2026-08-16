@@ -283,7 +283,12 @@ async def test_waking_restores_the_readings(hass, config_entry, mock_client):
 
 @pytest.mark.parametrize("placeholder", ["--", "---", "-----", "", "   ", " -- "])
 async def test_a_field_of_dashes_is_not_a_reading(hass, config_entry, mock_client, placeholder):
-    """The unit pads an empty field with dashes as wide as the field. `-----` is not a value."""
+    """The unit pads a field it has no reading for, and the padding must never reach a dashboard.
+
+    The width of the padding follows the field rather than the meaning, so all of these spellings
+    mean the same nothing. What replaces them is the point of `no_signal_means`; what matters
+    here is that the raw placeholder never survives.
+    """
     await _setup(hass, config_entry, mock_client)
 
     mock_client.mirror.apply_ops(
@@ -292,7 +297,9 @@ async def test_a_field_of_dashes_is_not_a_reading(hass, config_entry, mock_clien
     _push(hass, mock_client, {"video_resolution"})
     await hass.async_block_till_done()
 
-    assert hass.states.get("sensor.test_processor_video_resolution").state == STATE_UNKNOWN
+    state = hass.states.get("sensor.test_processor_video_resolution").state
+    assert state == NO_SIGNAL
+    assert state != placeholder
 
 
 async def test_no_hdr_metadata_on_a_live_picture_is_sdr(hass, config_entry, mock_client):
