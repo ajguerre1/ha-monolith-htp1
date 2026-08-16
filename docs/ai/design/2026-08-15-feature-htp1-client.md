@@ -245,7 +245,7 @@ dangerous failure path untested.
 | **Parse budget resets only on deliberate re-request** | Resetting in the error path's own retry rebuilds the unthrottled `getmso` storm the cap exists to prevent. Without *any* reset the client can never recover | Either extreme; both were real Control4 defects |
 | **Per-client `random.Random(seed)`** | A library calling `random.seed()` mutates global state for all of Home Assistant | `random.seed()` — and unseeded RNG already caused lockstep reconnects |
 | **Injected `ClientSession`** | Lets the integration pass HA's managed session while keeping `client.py` free of HA imports | Creating a session internally: an unmanaged connector per config entry |
-| **`heartbeat=30.0`** | `aiohttp` derives the pong deadline as `N/2` with no second knob. 45 s worst-case detection sits inside the 60 s backoff cap | `autoping=False` + a hand-rolled ping loop, which then obliges us to answer the unit's own PINGs — reimplementing what aiohttp gets right |
+| **`heartbeat=30.0`** | `aiohttp` derives the pong deadline as `N/2` with no second knob — **verified in 3.14.3, `client_ws.py:93`: `self._pong_heartbeat = heartbeat / 2.0`**. So 30 s gives a 15 s pong deadline and 45 s worst-case half-open detection, inside the 60 s backoff cap | `autoping=False` + a hand-rolled ping loop, which then obliges us to answer the unit's own PINGs — reimplementing what aiohttp gets right |
 
 ## Non-Functional Requirements
 
