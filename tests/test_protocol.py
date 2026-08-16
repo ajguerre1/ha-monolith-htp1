@@ -92,6 +92,21 @@ def test_an_unknown_verb_is_unknown_not_malformed(wire_samples):
     assert parsed.kind is MessageKind.UNKNOWN
 
 
+def test_the_units_own_keepalive_is_free() -> None:
+    """The exact frame five live units send, roughly every thirty seconds each.
+
+    Captured 2026-08-16: 100 of these arrived in a ten-minute observation. They are the unit's
+    own application-level keepalive, not a WebSocket ping, and they carry no verb at all.
+
+    This is why `UNKNOWN` and `MALFORMED` are separate kinds. Counting an unrecognised frame
+    against the parse-failure budget of three would exhaust it about ninety seconds after
+    connecting, on a connection where nothing whatsoever is wrong, and the recovery path would
+    then re-request a 41 KB document from every unit for ever.
+    """
+    parsed = protocol.parse_message('{"type":"ping","timestamp":1786918488442}')
+    assert parsed.kind is MessageKind.UNKNOWN
+
+
 def test_undecodable_input_is_malformed(wire_samples):
     """This is the one that counts against the budget."""
     parsed = protocol.parse_message(wire_samples["invalid_json_argument"])

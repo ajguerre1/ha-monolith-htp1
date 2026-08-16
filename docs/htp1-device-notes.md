@@ -11,6 +11,10 @@ source — front panel, web UI, another controller — so there is never a reaso
 you asked for instead of what it did. Optimism belongs in a separate overlay that a confirming
 push deletes, never in the mirror itself.
 
+The front-panel half of that is measured, not assumed: a knob turned by hand on one unit
+produced `msoupdate` on a socket that had asked for nothing, and the value reached a Home
+Assistant entity roughly 100 ms later. Nothing polls.
+
 ## Transport
 
 `ws://<host>/ws/controller`, port 80. **No auth, no TLS, no REST API, no mDNS, no SSDP.**
@@ -26,6 +30,18 @@ spaces.
 
 Unsolicited: `msoupdate [ops]` on every change from any source. Sometimes a **single unwrapped
 op** instead of an array, and on newer firmware sometimes **bare JSON with no verb at all**.
+
+The unit also sends its own keepalive as an application frame, not a WebSocket ping:
+
+```json
+{"type":"ping","timestamp":1786918488442}
+```
+
+That is the verbless case in practice, and it arrives every few minutes per unit whether or not
+anything is happening. **A client that counts unrecognised frames against a parse-failure budget
+will exhaust it on an idle connection and start re-requesting the document for no reason** — an
+unknown frame must be free, and only a frame that was supposed to parse and did not should cost
+anything.
 
 An idle connection sent **zero bytes over 90 seconds**. This is a push device; any poll interval
 is pure waste. Concurrent controller connections are served independently, so reading never
