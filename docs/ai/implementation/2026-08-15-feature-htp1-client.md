@@ -20,7 +20,7 @@ in the planning doc.
 | T5 client: transport | **done** | 23 tests; 183 total green; slowest test 0.04 s. Two API warts raised at review and fixed |
 | T6 client: read path | **done** | 17 tests; 200 total green. Budget guard demonstrated against a deliberately broken implementation |
 | T7a client: queue, guard, interlock | **done** | 26 tests; 226 total green |
-| T7b client: pending overlay, reconcile | todo | |
+| T7b client: pending overlay, reconcile | **done** | 15 tests; 241 total green. Corrected a design claim about notification |
 | T8 fake device | todo | |
 | T9 integration tests | todo | |
 | T10 probe script | todo | |
@@ -322,6 +322,42 @@ can compare like with like; `/loudness` becomes `"on"` only on the way out.
 
 **The queue is discarded in `_teardown`**, which every disconnect path already runs through, so
 there is no route that reconnects with stale operations still pending.
+
+### T7b — the pending overlay and the reconcile watchdog
+
+`_pending` sits **beside** the mirror, never inside it. `optimistic(path)` reads queue, then
+pending, then device truth.
+
+**Rollback is a deletion.** Because no optimistic value was ever written into the mirror, giving
+up on one means dropping a dict entry — there is no previous value to restore and therefore no
+way to clobber a push that arrived while the write was outstanding.
+`test_a_rollback_does_not_clobber_a_newer_push` pins the ordering.
+
+**Confirmation is by value, and it is done before the mirror sees the push.** This ordering is
+load-bearing and easy to get backwards: the mirror change-gates a push that matches what it
+already holds, so waiting for its change set to decide what was confirmed would lose
+confirmations entirely. `_confirm` therefore reads the raw operation paths.
+
+A container push confirms the leaves beneath it (`/cal` confirms `/cal/lipsync`), and a full
+document confirms everything, being a census.
+
+#### A design claim the tests disproved
+
+The design's notification table said a confirming push would notify nobody, because "the mirror
+assign is a no-op relative to what listeners already saw". `test_a_confirming_push_notifies_nobody`
+failed, and the overlay is exactly why the claim was wrong: the optimistic value never lived in
+the mirror, so the confirming push moves it from the old value to the new one and the change set
+is not empty.
+
+The valuable property survives in a different form, and the test now asserts *that* instead: the
+value an entity reads is identical either side of a confirmation, so the entity's snapshot
+compare suppresses the state write. The zero-cost guarantee comes from change-gating layer 3,
+not from an empty change set at layer 1. Design doc corrected in place rather than quietly
+diverged from.
+
+**Rollback always notifies**, rather than only when the re-read differs as the design suggested.
+The client cannot know what an entity displayed, and an entity stuck showing a value the unit
+never adopted — with nothing to correct it — is the worse failure.
 
 ### Patterns
 

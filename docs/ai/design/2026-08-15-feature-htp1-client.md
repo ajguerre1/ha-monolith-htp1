@@ -161,12 +161,24 @@ optimistic(path) -> _pending.get(path, _mirror.get(path))
 | Event | Notifies? |
 |---|---|
 | `async_write` accepted | Yes, immediately — this is what makes a slider feel instant |
-| Confirming push arrives with the value we asked for | No. The mirror assign is a no-op relative to what listeners already saw, so the change set is empty |
+| Confirming push arrives with the value we asked for | **Yes** — corrected during T7b, see below |
 | Push arrives with a *different* value (clamped, or someone else changed it) | Yes |
-| Reconcile rollback | Yes, if the re-read differs from what was shown optimistically |
+| Reconcile rollback | Yes, always, for the rolled-back fields |
 
-This is the first of the three change-gating layers, and it is why a confirmation round-trip
-costs zero entity writes in the common case.
+> **Corrected in implementation (T7b).** This table originally said a confirming push would
+> notify nobody, on the reasoning that "the mirror assign is a no-op relative to what listeners
+> already saw". That is wrong, and the overlay is exactly why: the optimistic value never lived
+> in the mirror, so when the confirming push lands the mirror genuinely moves from the old value
+> to the new one and the change set is **not** empty.
+>
+> The useful property survives in a different form. The value an entity *reads* —
+> `optimistic(path)` — is identical either side of a confirmation, so the entity's snapshot
+> compare suppresses the state write and nothing reaches the wall panels. The zero-cost
+> guarantee is delivered by change-gating layer 3, not by an empty change set at layer 1.
+>
+> Rollback likewise always notifies, rather than conditionally: the client cannot know what an
+> entity displayed, and an entity left showing a value the unit never adopted, with no
+> correction, is the worse failure.
 
 ### Start and stop contract
 

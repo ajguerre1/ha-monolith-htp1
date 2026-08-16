@@ -31,7 +31,9 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 | T4 `mso.py` + `options.py` | **done** | `options.py` was not a planned module; the design put these functions in `models.py`, but they consume the mirror's collections |
 | T5 client: transport | **done** | Two API warts raised at review and fixed before T6 |
 | T6 client: read path | **done** | Budget guard demonstrated against a broken build, not assumed |
-| T7 client: write path | next | The densest task; split the reconcile watchdog out if it grows |
+| T7a client: queue, guard, interlock | **done** | Split as the plan advised rather than landing T7 as one change |
+| T7b client: pending overlay, reconcile | **done** | Disproved a design claim about notification; design corrected |
+| T8 fake device | next | |
 | T8–T10 tools | not started | |
 | T11 probe live | **blocked — needs approval**, by design | |
 | T12 reconcile | not started | |

@@ -27,7 +27,7 @@ import asyncio
 import contextlib
 import logging
 import random
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any
 
 from aiohttp import WSMsgType
@@ -47,6 +47,11 @@ DEFAULT_JITTER_RATIO = 0.2
 # message per pixel.
 DEFAULT_FLUSH_DELAY = 0.05
 
+# How long a written value may go unconfirmed before the client gives it up and re-reads.
+# There is no reply to a `changemso`, so this watchdog is the only thing that notices a
+# write the unit silently ignored.
+DEFAULT_RECONCILE_DELAY = 2.0
+
 # A parse failure means the unit sent bytes this client could not decode as its own protocol;
 # the ~38 KB document is the realistic case. Below this many consecutive failures the fastest
 # recovery is simply asking again. At it, something is wrong enough that re-reading at line rate
@@ -58,6 +63,16 @@ WS_PORT = 80
 WS_PATH = "/ws/controller"
 
 _DISCONNECTED = frozenset({WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.CLOSED, WSMsgType.ERROR})
+
+
+def _fields_for(paths: Iterable[str]) -> frozenset[str]:
+    """The field names entities listen on, for a set of wire paths."""
+    names = set()
+    for path in paths:
+        field = TRACKED_PATHS.get(path)
+        if field is not None:
+            names.add(field.name)
+    return frozenset(names)
 
 
 class Htp1Error(Exception):
@@ -95,6 +110,7 @@ class Htp1Client:
         backoff: tuple[float, ...] = DEFAULT_BACKOFF,
         jitter_ratio: float = DEFAULT_JITTER_RATIO,
         flush_delay: float = DEFAULT_FLUSH_DELAY,
+        reconcile_delay: float = DEFAULT_RECONCILE_DELAY,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._session = session
@@ -105,6 +121,7 @@ class Htp1Client:
         self._backoff = backoff
         self._jitter_ratio = jitter_ratio
         self._flush_delay = flush_delay
+        self._reconcile_delay = reconcile_delay
         self._sleep = sleep or asyncio.sleep
 
         # Per-client generator. Seeding the global one would be a house-wide side effect.
@@ -120,6 +137,9 @@ class Htp1Client:
         self._listeners: list[Callable[[frozenset[str]], None]] = []
         self._queue: dict[str, Any] = {}
         self._flush_task: asyncio.Task[None] | None = None
+        # Written and sent, not yet echoed back. Deliberately NOT inside the mirror.
+        self._pending: dict[str, Any] = {}
+        self._reconcile_task: asyncio.Task[None] | None = None
 
     # -- properties ----------------------------------------------------------------------
 
@@ -264,7 +284,7 @@ class Htp1Client:
             self._check_writable(path, value)
         for path, value in pairs.items():
             # Already there, so writing again would be noise on the wire and in the room.
-            if self._optimistic(path) == value:
+            if self.optimistic(path) == value:
                 continue
             self._queue[path] = value
         self._schedule_flush()
@@ -285,17 +305,23 @@ class Htp1Client:
         if path not in WRITABLE_PATHS and not WRITABLE_INPUT_DELAY.match(path):
             raise Htp1WriteError(f"{path} is not a path this integration may write")
 
-    def _optimistic(self, path: str) -> Any:
-        """What this path is believed to hold: queued value first, then device truth.
+    def optimistic(self, path: str) -> Any:
+        """What this path is believed to hold: queued, then sent-but-unconfirmed, then truth.
 
-        Comparing against device truth alone would let a second write of an already-queued
-        value through, because the mirror does not learn the new value until the unit echoes
-        it back.
+        Device truth alone would let a second write of the same value through for as long as
+        confirmation takes, which is most of what the guard exists to stop.
         """
         if path in self._queue:
             return self._queue[path]
+        if path in self._pending:
+            return self._pending[path]
         field = TRACKED_PATHS.get(path)
         return self._mirror.get(field.name) if field else None
+
+    @property
+    def pending_paths(self) -> tuple[str, ...]:
+        """Paths written but not yet echoed back by the unit."""
+        return tuple(self._pending)
 
     def _schedule_flush(self) -> None:
         if self._queue and (self._flush_task is None or self._flush_task.done()):
@@ -317,6 +343,71 @@ class Htp1Client:
             await self._ws.send_str(protocol.encode_change(ops))
         except Exception as err:
             _LOGGER.debug("write to %s failed: %s", self._host, err)
+            return
+
+        # Sent. It now lives in the overlay until the unit echoes it back.
+        self._pending.update(queued)
+        self._arm_reconcile()
+        self._notify(_fields_for(queued))
+
+    def _confirm(self, paths: Iterable[str]) -> None:
+        """Clear pending entries the unit has now spoken about.
+
+        Confirmation is **by value, not by acknowledgement**: `changemso` has no reply, so a
+        path leaves the overlay when any push arrives for it. If the unit clamped or ignored
+        the request, that push carries a different value, the overlay clears anyway, and the
+        entity settles on the unit's answer — which is the correct outcome, and the reason dB
+        is the truth rather than the percentage that was asked for.
+        """
+        if not self._pending:
+            return
+        for spoken in paths:
+            for path in list(self._pending):
+                if path == spoken or path.startswith(spoken + "/"):
+                    del self._pending[path]
+        if not self._pending:
+            self._cancel_reconcile()
+
+    def _arm_reconcile(self) -> None:
+        """Start the watchdog fresh.
+
+        Re-armed per flush rather than left running from the first write: inheriting an older
+        deadline would give a later write less than its full grace period.
+        """
+        self._cancel_reconcile()
+        self._reconcile_task = asyncio.create_task(self._reconcile_after_delay())
+
+    def _cancel_reconcile(self) -> None:
+        task, self._reconcile_task = self._reconcile_task, None
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _reconcile_after_delay(self) -> None:
+        await self._sleep(self._reconcile_delay)
+        await self._reconcile()
+
+    async def _reconcile(self) -> None:
+        """Give up on unconfirmed writes and ask the unit what is actually true.
+
+        Rollback is a **deletion**, not a restore. Nothing optimistic was ever written into the
+        mirror, so there is no stale value to put back and no way to clobber a push that
+        arrived while the write was outstanding.
+
+        Listeners are told which fields were rolled back, or an entity would sit showing a
+        value the unit never adopted, with nothing to correct it.
+        """
+        if not self._pending:
+            return
+        rolled_back, self._pending = self._pending, {}
+        _LOGGER.debug("%s did not confirm %s; re-reading", self._host, sorted(rolled_back))
+        self._notify(_fields_for(rolled_back))
+        if self.connected:
+            # A deliberate re-request, and so one of the three places the budget may reset.
+            await self.async_refresh()
+
+    def _discard_pending(self) -> None:
+        self._pending = {}
+        self._cancel_reconcile()
 
     @staticmethod
     def _encode(path: str, value: Any) -> Any:
@@ -441,8 +532,13 @@ class Htp1Client:
             self._parse_failures = 0
 
             if message.kind is protocol.MessageKind.DOCUMENT:
+                # A document is a census, so it speaks for every path at once.
+                self._discard_pending()
                 self._notify(self._mirror.apply_document(message.document))
             elif message.kind is protocol.MessageKind.UPDATE:
+                # Confirm first: the mirror drops a push that matches what we already showed,
+                # so waiting for its change set would lose the confirmation entirely.
+                self._confirm(op["path"] for op in message.ops if isinstance(op.get("path"), str))
                 self._notify(self._mirror.apply_ops(message.ops))
             elif message.kind is protocol.MessageKind.ERROR:
                 # The unit rejected something we said. The connection survives, and there is
@@ -473,6 +569,7 @@ class Htp1Client:
 
     async def _teardown(self) -> None:
         self._discard_queue()
+        self._discard_pending()
         connection, self._connection = self._connection, None
         self._ws = None
         if connection is not None:

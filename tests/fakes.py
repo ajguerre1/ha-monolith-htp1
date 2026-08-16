@@ -122,11 +122,27 @@ class _HangingConnection:
 
 
 class RecordingSleeper:
-    """Records the delays it was asked for instead of waiting them out."""
+    """Records the delays it was asked for instead of waiting them out.
 
-    def __init__(self) -> None:
+    Delays listed in `hold` block until `release()` is called for them, which is how a test
+    keeps a timer from firing without any real waiting. Everything else returns on the next
+    event-loop tick, so nothing in this suite sleeps on a wall clock.
+    """
+
+    def __init__(self, hold: set[float] | None = None) -> None:
         self.delays: list[float] = []
+        self._hold = set(hold or ())
+        self._gates: dict[float, asyncio.Event] = {}
 
     async def __call__(self, delay: float) -> None:
         self.delays.append(delay)
+        if delay in self._hold:
+            gate = self._gates.setdefault(delay, asyncio.Event())
+            await gate.wait()
+            gate.clear()
+            return
         await asyncio.sleep(0)  # yield, so the supervisor loop stays cooperative
+
+    def release(self, delay: float) -> None:
+        """Let a held delay through, once."""
+        self._gates.setdefault(delay, asyncio.Event()).set()
