@@ -12,6 +12,7 @@ machine that was supposed to be able to run them.
 
 from __future__ import annotations
 
+import ast
 import importlib
 import sys
 
@@ -19,9 +20,27 @@ import pytest
 
 # `tests/` deliberately has no __init__.py, so pytest collects with the directory on sys.path
 # and conftest is a top-level module here rather than a relative import.
-from conftest import DOMAIN, HA_AVAILABLE
+from conftest import DOMAIN, HA_AVAILABLE, REPO_ROOT
 
 PACKAGE = f"custom_components.{DOMAIN}"
+CLIENT_DIR = REPO_ROOT / "custom_components" / DOMAIN / "htp1"
+
+
+def _home_assistant_imports(source: str) -> list[str]:
+    """Return every `homeassistant` import in `source`, by AST rather than by grepping.
+
+    A substring search would be fooled by the word appearing in a docstring — which it does,
+    repeatedly, in this very package.
+    """
+    found: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            found.extend(a.name for a in node.names if a.name.split(".")[0] == "homeassistant")
+        elif isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".")[0]
+            if root == "homeassistant":
+                found.append(node.module or "")
+    return found
 
 
 def test_the_vendored_package_is_importable_without_home_assistant():
@@ -44,3 +63,35 @@ def test_the_parent_packages_are_stubbed_when_home_assistant_is_absent():
             f"{name} was loaded from disk rather than stubbed, so its __init__.py ran"
         )
         assert sys.modules[name].__path__, f"{name} needs a __path__ for submodules to resolve"
+
+
+def test_the_home_assistant_import_detector_actually_detects():
+    """A guard that cannot fail is not a guard. Prove the detector before trusting it."""
+    assert _home_assistant_imports("import homeassistant") == ["homeassistant"]
+    assert _home_assistant_imports("from homeassistant.core import HomeAssistant") == [
+        "homeassistant.core"
+    ]
+    assert _home_assistant_imports("import homeassistant.helpers.entity as e") == [
+        "homeassistant.helpers.entity"
+    ]
+    # The word appears in prose all over this package; only real imports count.
+    assert _home_assistant_imports('"""Mentions homeassistant in a docstring."""') == []
+    assert _home_assistant_imports("import aiohttp\nfrom json import loads") == []
+
+
+def test_the_client_package_imports_no_home_assistant():
+    """AC-19. This is the property that keeps the whole client testable off a Home Assistant box.
+
+    It is also the property that lets `manifest.json` stay `requirements: []`, since the client
+    is vendored rather than depended upon.
+    """
+    offenders: dict[str, list[str]] = {}
+    sources = sorted(CLIENT_DIR.glob("*.py"))
+    assert sources, f"no modules found under {CLIENT_DIR}; the glob is probably wrong"
+
+    for path in sources:
+        imports = _home_assistant_imports(path.read_text(encoding="utf-8"))
+        if imports:
+            offenders[path.name] = imports
+
+    assert not offenders, f"the vendored client must not import Home Assistant: {offenders}"

@@ -14,12 +14,46 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 
 ## Milestones
 
-- [ ] **M1.A Foundations** — fixtures and the Windows-safe test harness (T1)
-- [ ] **M1.B Pure layers** — `protocol.py`, `models.py`, `mso.py` (T2–T4). No I/O, no async
+- [x] **M1.A Foundations** — fixtures and the Windows-safe test harness (T1)
+- [ ] **M1.B Pure layers** — `protocol.py` ✅, `models.py`, `mso.py` (T2–T4). No I/O, no async
 - [ ] **M1.C The client** — transport, read path, write path (T5–T7)
 - [ ] **M1.D Tools** — fake device, integration tests, probe script (T8–T10)
 - [ ] **M1.E Measure** — read-only probe of all five units; close HW-02/03/04/07 (T11)
 - [ ] **M1.F Reconcile** — backlog, memory, docs (T12)
+
+## Status — reconciled after T2
+
+| Task | Status | Notes |
+|---|---|---|
+| T1 fixtures and harness | **done** | Fixtures regenerated rather than ported, at the user's direction — closes R5 by construction |
+| T2 `protocol.py` | **done** | 34 tests. Split `MALFORMED` from `UNKNOWN`, which the plan had not called out |
+| T3 `models.py` | next | |
+| T4 `mso.py` | not started | |
+| T5–T7 client | not started | |
+| T8–T10 tools | not started | |
+| T11 probe live | **blocked — needs approval**, by design | |
+| T12 reconcile | not started | |
+
+**Progress.** 56 tests green on Windows with Home Assistant absent; ruff check and format clean.
+Both pure-layer foundations are in: the fixtures every later test reads, and the codec every
+later layer sits on. No production code exists above `protocol.py` yet, so nothing can regress
+silently while the mirror and client are built.
+
+**Scope changes.** Two tests were added that the plan did not foresee, both guards rather than
+features: the fixtures are tested for firmware-shape divergence and for site data, and the
+Home-Assistant-import detector is tested against synthetic violations so it cannot pass
+vacuously. Neither changes the milestone's shape.
+
+**Risks.** Unchanged, except that R5 (fixtures carrying site data) is closed by regeneration
+plus `test_fixtures_carry_no_site_data`. R6 still stands and is the live one: T7 is the densest
+task and should be split at the reconcile watchdog if it grows.
+
+**Next 3.** T3 `models.py` — the dB round-trip including the −127..0 range that exposed Q4, and
+`test_the_fraction_is_never_quantised`. Then T4 `mso.py`, the largest unit in the milestone.
+Then T5, the first module that touches a socket.
+
+**Coordination.** None needed until T11, which requires an explicit go-ahead before touching
+live hardware.
 
 ## Task Breakdown
 

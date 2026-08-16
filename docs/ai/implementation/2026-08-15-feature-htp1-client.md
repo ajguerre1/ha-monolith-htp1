@@ -14,7 +14,7 @@ in the planning doc.
 | Task | Status | Evidence |
 |---|---|---|
 | T1 fixtures and test harness | **done** | 20 tests pass on Windows with Home Assistant absent; ruff check + format clean |
-| T2 `protocol.py` | todo | |
+| T2 `protocol.py` | **done** | 34 protocol tests + 2 package-hygiene tests; 56 total green; ruff clean |
 | T3 `models.py` | todo | |
 | T4 `mso.py` | todo | |
 | T5 client: transport | todo | |
@@ -93,12 +93,43 @@ fixture.
 labels** (`h1` and `spdif1` are both "Media Player") and a **visible input with a blank label**
 (`h4`).
 
+### T2 — `protocol.py`
+
+Pure codec: no I/O, no state, no clock. `parse_message` never raises, because a device we do
+not control is on the other end and an exception there drops the link.
+
+**`MALFORMED` and `UNKNOWN` are separate kinds, and the split is the design.** Both are
+"we did not act on this", but they mean opposite things to the client above:
+
+| Kind | Meaning | Consequence |
+|---|---|---|
+| `MALFORMED` | A verb we own carried an argument we could not decode — e.g. `mso {not json` | Counts against the parse-failure budget of 3 |
+| `UNKNOWN` | Decoded cleanly, shape not one we act on — an unknown verb, bare JSON we do not recognise, an empty frame | **Free.** Ignored, logged at debug |
+
+Conflating them fails in one of two directions: either newer firmware saying something novel
+throttles a perfectly healthy connection, or genuine corruption never trips the cap that exists
+to stop a `getmso` storm against a live unit.
+
+**Bare-JSON classification** is a shape sniff, in this order: operations first (an array of
+`{op, path}`, or a single unwrapped one), then a document if the object carries any of fifteen
+known top-level MSO keys, else `UNKNOWN`. Guessing "document" from an arbitrary object would
+let an unrelated payload wipe the mirror.
+
+**`encode_change` raises rather than emitting anything questionable** — empty arrays and any
+op that is not `replace`. Both are refusals to send, not runtime checks on incoming data: the
+caller has the bug, and the consequence lands on a live processor.
+
 ### Patterns
 
 - **Test names are full sentences** describing behaviour, and each module docstring names the
   defect the suite guards against. This is what stops a later reader "simplifying" a guard away.
 - **Fixtures are tested.** Three fixtures that are quietly the same shape would prove nothing
   about firmware skew, so their differences are asserted rather than assumed.
+- **Guards prove they can fail.** The Home Assistant import detector has its own test against
+  synthetic violations, including a docstring mention that must not trip it. A green assertion
+  from a detector that never fires is worse than no assertion, because it reads as coverage.
+- **Detection by AST, not by grep**, wherever source is being inspected — this package
+  discusses Home Assistant constantly in prose.
 
 ## Integration Points
 

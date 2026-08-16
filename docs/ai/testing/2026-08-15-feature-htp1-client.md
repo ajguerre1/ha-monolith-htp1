@@ -43,20 +43,45 @@ are ground truth for every later test, so they are tested themselves.
 
 *Evidence:* 20 tests pass on Windows with `import homeassistant` raising `ModuleNotFoundError`.
 
-### `protocol.py` — the wire codec
+### `protocol.py` — the wire codec (T2) — **complete**
 
-- [ ] `test_a_payload_containing_spaces_is_not_split_further` — `mso {"unitname":"a b c"}`
+Names below are the ones that shipped; a few drifted from the originals as the behaviour got
+sharper. 34 tests.
+
+*Framing*
+- [x] `test_a_payload_containing_spaces_is_not_split_further` — `mso {"unitname":"a b c"}`
       parses with the value intact (AC-15)
-- [ ] `test_a_verb_with_no_argument_parses` — bare `getmso`
-- [ ] `test_parse_never_raises` — table-driven over ~40 malformed inputs: empty string, verb
-      only, trailing space, invalid JSON, JSON `null`, a lone `[`, non-UTF8-ish text
-- [ ] `test_error_frames_are_recognised_and_survivable` — `error "bad-verb"` (AC-16)
-- [ ] `test_classify_bare_recognises_a_document` — bare JSON object with document shape
-- [ ] `test_classify_bare_recognises_an_op_array_and_a_single_op`
-- [ ] `test_classify_bare_drops_anything_else` — returns None rather than guessing
-- [ ] `test_encode_change_refuses_an_empty_op_list` — raises, never emits `[]` (AC-06)
-- [ ] `test_only_replace_operations_are_emitted` (AC-07)
-- [ ] `test_encoded_change_is_one_message_with_all_ops`
+- [x] `test_a_verb_with_no_argument_parses` — bare `getmso`
+- [x] `test_a_document_is_recognised`
+- [x] `test_an_update_carries_its_operations`
+- [x] `test_multiple_operations_survive_in_order`
+- [x] `test_a_single_unwrapped_operation_is_accepted`
+- [x] `test_an_untracked_path_still_parses` — filtering is the mirror's job, not the codec's
+
+*Errors and the unrecognised*
+- [x] `test_error_frames_are_recognised_and_survivable` — `error "bad-verb"` (AC-16)
+- [x] `test_an_unknown_verb_is_unknown_not_malformed` — **the distinction that matters**: it
+      decoded, so it must not spend parse budget
+- [x] `test_undecodable_input_is_malformed` — the case that *does* count
+- [x] `test_degenerate_frames_never_raise` — parametrised over empty, space-only, lone bracket
+- [x] `test_parse_never_raises` — table-driven over 41 hostile inputs
+
+*Bare JSON (newer firmware)*
+- [x] `test_bare_json_document_is_recognised`
+- [x] `test_bare_json_operation_array_is_recognised`
+- [x] `test_bare_json_single_operation_is_recognised`
+- [x] `test_bare_json_we_do_not_recognise_is_unknown_not_malformed`
+
+*Encoding*
+- [x] `test_get_mso_is_a_bare_verb`
+- [x] `test_encode_change_produces_one_message_with_all_operations`
+- [x] `test_encode_change_refuses_an_empty_operation_list` — raises, never emits `[]` (AC-06)
+- [x] `test_only_replace_operations_are_emitted` (AC-07)
+- [x] `test_encoded_messages_are_split_on_the_first_space_by_our_own_parser` — round-trip
+
+*`normalise_ops`*
+- [x] `test_normalise_ops_accepts_both_shapes` — parametrised: array, single op, multi, empty
+- [x] `test_normalise_ops_rejects_anything_that_is_not_operations` — parametrised over 7 shapes
 
 ### `models.py` — value semantics
 
@@ -173,9 +198,14 @@ Driven by an injected fake transport and a controllable clock; no socket.
 
 ### Package hygiene
 
-- [ ] `test_the_client_package_imports_no_home_assistant` — walks `htp1/*.py` and asserts no
+- [x] `test_the_client_package_imports_no_home_assistant` — walks `htp1/*.py` and asserts no
       `homeassistant` import. This is the property that keeps the suite runnable on Windows
-      (AC-19)
+      (AC-19). Uses an AST walk, not a substring search: the word appears in prose throughout
+      this package, so grepping would produce false positives forever
+- [x] `test_the_home_assistant_import_detector_actually_detects` — proves the detector above can
+      fail, against `import homeassistant`, `from homeassistant.core import ...`, an aliased
+      import, and a docstring mention that must *not* trip it. A guard that cannot fail is not
+      a guard
 - [ ] `test_the_suite_installs_from_requirements_test` — asserts `aiohttp` is declared there
       rather than arriving through `pytest-homeassistant-custom-component`, which is unusable on
       the Windows dev box (Q7)
