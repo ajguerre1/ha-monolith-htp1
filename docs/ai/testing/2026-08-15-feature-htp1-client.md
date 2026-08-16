@@ -341,15 +341,28 @@ Driven by an injected fake transport and a controllable clock; no socket.
 - [ ] `test_writing_the_value_already_there_is_not_an_error` — returns successfully having sent
       nothing (AC-02), rather than raising
 
-### `scripts/probe_htp1.py` — the read-only probe
+### `scripts/probe_htp1.py` — the read-only probe (T10) — **complete**
 
-- [ ] `test_the_probe_is_read_only_by_construction` — asserts the script never passes
-      `allow_writes=True` and never calls a write method. Source-level, like
-      `ha_somfy`'s `test_probe_safety.py`, because the guarantee must hold for a script nobody
-      is unit-testing line by line (AC-21)
-- [ ] `test_the_probe_summary_scrubs_site_data` — unit name, input labels, Dirac slot names and
-      serial are redacted in the default summary. Raw output is opt-in and goes to gitignored
-      `scripts/output/`
+9 tests.
+
+- [x] `test_the_probe_exists`
+- [x] `test_the_probe_never_mentions_allow_writes` (AC-21) — **stronger than the planned check**.
+      The plan said "never passes `allow_writes=True`"; this asserts the script never names the
+      keyword at all, so enabling writes cannot be a one-character edit
+- [x] `test_the_probe_never_calls_a_write_method`
+- [x] `test_the_read_only_detector_actually_detects` — proves both guards above can fail
+- [x] `test_the_summary_scrubs_site_data` — unit name, serial, every input label and every
+      Dirac slot name checked against the actual digest
+- [x] `test_the_summary_answers_the_open_hardware_questions` — HW-02, HW-03, HW-04, HW-07
+- [x] `test_the_summary_counts_rather_than_naming` — counts describe the unit; names describe
+      the house
+- [x] `test_a_legacy_document_reports_the_missing_video_block`
+- [x] `test_a_mac_address_is_reported_by_path_not_by_value` — HW-03 asks *whether* a MAC exists;
+      the address itself is still site data, so only the path is reported
+
+*Also verified by hand against the fake device over a real socket:* the digest contains no unit
+name, serial value, input label or slot name, and `observe` reports zero pushes from an idle
+unit — which is the expected result and the reason this integration never polls.
 
 ### Package hygiene
 

@@ -16,12 +16,12 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 
 - [x] **M1.A Foundations** — fixtures and the Windows-safe test harness (T1)
 - [x] **M1.B Pure layers** — `protocol.py`, `models.py`, `mso.py`, `options.py` (T2–T4)
-- [ ] **M1.C The client** — transport, read path, write path (T5–T7)
-- [ ] **M1.D Tools** — fake device ✅, integration tests ✅, probe script (T8–T10)
+- [x] **M1.C The client** — transport, read path, write path (T5–T7)
+- [x] **M1.D Tools** — fake device, integration tests, probe script (T8–T10)
 - [ ] **M1.E Measure** — read-only probe of all five units; close HW-02/03/04/07 (T11)
 - [ ] **M1.F Reconcile** — backlog, memory, docs (T12)
 
-## Status — reconciled after T2
+## Status — reconciled after T10
 
 | Task | Status | Notes |
 |---|---|---|
@@ -35,31 +35,40 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 | T7b client: pending overlay, reconcile | **done** | Disproved a design claim about notification; design corrected |
 | T8 fake device | **done** | 8 faults; two bugs in the fake itself would have made tests lie |
 | T9 integration tests | **done** | Found the missing parse budget in `_read_until_document`, which no in-process fake could have surfaced |
-| T10 probe script | next | |
-| T8–T10 tools | not started | |
-| T11 probe live | **blocked — needs approval**, by design | |
+| T10 probe script | **done** | Read-only guard is stricter than planned: the word `allow_writes` may not appear at all |
+| T11 probe the five units | **blocked — awaiting go-ahead**, by design | Read-only, but it is live hardware in occupied rooms |
 | T12 reconcile | not started | |
 
-**Progress.** 56 tests green on Windows with Home Assistant absent; ruff check and format clean.
-Both pure-layer foundations are in: the fixtures every later test reads, and the codec every
-later layer sits on. No production code exists above `protocol.py` yet, so nothing can regress
-silently while the mirror and client are built.
+**Progress.** 263 tests green in 1.4 s, on Windows, with Home Assistant absent and no device
+present. ruff check and format clean. Everything in M1 is done except measuring real hardware
+and the closing reconcile: the client is complete, proven against a real socket, and has a
+read-only probe that cannot write.
 
-**Scope changes.** Two tests were added that the plan did not foresee, both guards rather than
-features: the fixtures are tested for firmware-shape divergence and for site data, and the
-Home-Assistant-import detector is tested against synthetic violations so it cannot pass
-vacuously. Neither changes the milestone's shape.
+**Scope changes.** Four, none of which altered the milestone's shape:
+- `options.py` became its own module. The design put those functions in `models.py`, but they
+  consume the mirror's collections.
+- T7 was split into T7a and T7b, as this plan advised rather than as a surprise.
+- Two Control4 faults (`trickle`, `drop-mid-frame`) were dropped from the fake with reasons
+  recorded: aiohttp owns framing here, so they would test aiohttp.
+- The probe's read-only guard is stricter than specified — the word `allow_writes` may not
+  appear in the script at all.
 
-**Risks.** Unchanged, except that R5 (fixtures carrying site data) is closed by regeneration
-plus `test_fixtures_carry_no_site_data`. R6 still stands and is the live one: T7 is the densest
-task and should be split at the reconcile watchdog if it grows.
+**Defects found by tests rather than by review**, which is the part worth keeping:
+- A floating-point tie that returned a volume one dB *louder* than requested (T3).
+- A design claim about notification that the overlay made false (T7b).
+- A missing parse budget in `_read_until_document`, which no in-process fake could surface (T9).
+- Two bugs in the fake device itself, both of which would have made tests pass vacuously (T8).
 
-**Next 3.** T3 `models.py` — the dB round-trip including the −127..0 range that exposed Q4, and
-`test_the_fraction_is_never_quantised`. Then T4 `mso.py`, the largest unit in the milestone.
-Then T5, the first module that touches a socket.
+**Risks.** R5 closed by regeneration plus `test_fixtures_carry_no_site_data`. R6 closed by
+splitting T7. R3 closed by verifying aiohttp's pong derivation. R7 held: no test in this
+milestone waits on a real timer except the integration tests, deliberately, where aiohttp's own
+behaviour is the thing under test. R1, R2 and R8 remain open and are exactly what T11 addresses.
 
-**Coordination.** None needed until T11, which requires an explicit go-ahead before touching
-live hardware.
+**Next.** T11 — read-only probe of all five units, closing HW-02/03/04/07 before M2 encodes
+assumptions about the volume range and the `/eq/tc` type. Then T12.
+
+**Coordination.** T11 needs an explicit go-ahead. Reading is provably passive, but it is live
+hardware in an occupied home, so it does not happen on my own initiative.
 
 ## Task Breakdown
 

@@ -23,7 +23,7 @@ in the planning doc.
 | T7b client: pending overlay, reconcile | **done** | 15 tests; 241 total green. Corrected a design claim about notification |
 | T8 fake device | **done** | `tools/fake_htp1.py`, 8 faults, usable as a CLI and importable by tests |
 | T9 integration tests | **done** | 13 tests over loopback; found a real gap in the client |
-| T10 probe script | todo | |
+| T10 probe script | **done** | 9 tests; 263 total green. Verified against the fake over a real socket |
 | T11 probe the five units (read-only, **gated on approval**) | todo | |
 | T12 reconcile | todo | |
 
@@ -392,6 +392,35 @@ rather than an oversight.
 
 The startup banner is flushed, because the usual caller is a script waiting to learn the port
 and Python buffers stdout when it is a pipe.
+
+### T10 — `scripts/probe_htp1.py`
+
+Two modes. `summary` connects, asks once, prints a scrubbed digest, disconnects. `observe`
+holds the socket and prints which *fields* changed, never their values — a value could be an
+input label.
+
+**Read-only is enforced more strictly than planned.** The plan said the test should assert the
+probe never passes `allow_writes=True`. It now asserts the script never names `allow_writes`
+**at all**, so enabling writes cannot be a one-character edit to a `False`. Both that guard and
+the write-method guard have a test proving they can fail.
+
+**`summary` deliberately bypasses `Htp1Client`.** The client keeps a *projection* — about thirty
+leaves of a 38 KB document — which is the point of it, and exactly the wrong thing for a tool
+whose job is to report what the unit actually sent, including keys this integration has never
+heard of. It opens its own socket, sends `getmso`, and parses the reply. The first draft tried
+to recover the document from the client and had a stub that silently returned `{}`; the tests
+caught it.
+
+**The digest reports counts and shapes, not names.** Input labels, Dirac slot names, the unit
+name and the serial are the owner's, so the summary carries `visible: 7` rather than a list, and
+`serial_present: true` rather than a serial. A MAC address (HW-03) is reported by **path** —
+whether one exists is what decides if DHCP discovery is buildable; the address is still site
+data. `--raw` writes the full document to gitignored `scripts/output/` and says out loud that it
+must not be pasted anywhere.
+
+Verified end to end against the fake device: the digest answers all four measurable hardware
+questions and leaks none of the invented site data, and `observe` correctly reports zero pushes
+from an idle unit.
 
 ### Patterns
 
