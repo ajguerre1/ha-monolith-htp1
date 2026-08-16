@@ -1,0 +1,88 @@
+{
+  "unitname": "Lab Processor",
+  "powerIsOn": true,
+  "powerAction": "none",
+  "volume": -30,
+  "muted": false,
+  "input": "h2",
+  "loudness": "on",
+  "bassenhance": "off",
+  "night": "off",
+  "dialogEnh": 0,
+  "fastStart": "on",
+  "secondVolume": -45,
+  "vu": { "enable": "off" },
+  "inputs": {
+    "h1": { "label": "Media Player", "visible": true, "disable": false, "delay": 0 },
+    "h2": { "label": "Game Console", "visible": true, "disable": false, "delay": 0 },
+    "h3": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "h4": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "h5": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "h6": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "h7": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "h8": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "a1": { "label": "Turntable", "visible": true, "disable": false, "delay": 0 },
+    "a2": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "spdif1": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "spdif2": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "spdif3": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "optical1": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "optical2": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "optical3": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "aes": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "b": { "label": "", "visible": false, "disable": false, "delay": 0 },
+    "tv": { "label": "Television", "visible": true, "disable": false, "delay": 0 },
+    "usb": { "label": "", "visible": false, "disable": false, "delay": 0 }
+  },
+  "upmix": {
+    "select": "dolby",
+    "off": { "homevis": true },
+    "native": { "homevis": true },
+    "dolby": { "cs": false, "homevis": true },
+    "dts": { "ws": false, "homevis": true },
+    "auro": { "preset": 1, "strength": 10, "homevis": false },
+    "mono": { "homevis": false },
+    "stereo": { "homevis": true }
+  },
+  "eq": {
+    "tc": false,
+    "bass": { "freq": 100, "level": 0 },
+    "treble": { "freq": 8000, "level": 0 }
+  },
+  "cal": {
+    "vpl": -60,
+    "vph": -5,
+    "zeroPoint": -12,
+    "lipsync": 0,
+    "currentdiracslot": 0,
+    "diracactive": "off",
+    "slots": [
+      { "name": "Reference" },
+      { "name": "Music" },
+      {},
+      { "name": "" },
+      { "name": "Late Night" },
+      { "name": "Calibration Test" }
+    ]
+  },
+  "status": {
+    "SurroundMode": "Dolby Surround",
+    "DECSourceProgram": "PCM",
+    "DECProgramFormat": "2.0.0",
+    "DECSampleRate": "48 kHz",
+    "ENCListeningFormat": "5.1.2",
+    "ENCSampleRate": "48 kHz",
+    "DiracState": "off",
+    "raw": {
+      "decoderSampleRateEnum": 2,
+      "delayValues": [0, 0, 0, 0],
+      "activityMask": 0,
+      "formatCode": 3
+    }
+  },
+  "versions": {
+    "avController": "4.91 Built Mar 12 2024, 09:02:11\n",
+    "swVer": "V1.13.3",
+    "SerialNumber": "TESTSN0002"
+  }
+}
