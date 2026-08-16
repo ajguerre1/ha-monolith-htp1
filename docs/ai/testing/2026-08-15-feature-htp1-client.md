@@ -38,8 +38,14 @@ description: Define testing approach, test cases, and quality assurance
 
 - [ ] `test_every_db_survives_a_round_trip` — **the highest-value test in the suite**. For every
       integer dB across `(-50, 0)`, `(-80, 10)`, `(-127, 0)` and the degenerate `vph <= vpl`,
-      `fraction_to_db(db_to_fraction(db)) == db` (AC-03)
-- [ ] `test_ties_round_down_never_up` — every exact `.5` input, both signs (AC-04)
+      `fraction_to_db(db_to_fraction(db)) == db` (AC-03). The `(-127, 0)` case is the one that
+      matters: it has 128 dB values, so it fails outright if the fraction is ever rounded to an
+      integer percentage — 27 failures, the first returning one dB *louder* than requested
+- [ ] `test_the_fraction_is_never_quantised` — asserts `db_to_fraction` returns values a
+      101-step percentage could not represent. This is the regression guard for Q4: it fails
+      the moment someone "restores" the Control4 driver's `dbToPercent` behaviour
+- [ ] `test_ties_round_down_never_up` — every exact `.5` input to `fraction_to_db`, both signs
+      (AC-04)
 - [ ] `test_round_half_down_is_not_bankers_rounding` — pins the difference from `round()`
       explicitly, so a future "simplification" fails here
 - [ ] `test_a_degenerate_volume_range_does_not_divide_by_zero`
@@ -73,6 +79,11 @@ Driven by an injected fake transport and a controllable clock; no socket.
 
 - [ ] `test_600_identical_volume_writes_send_nothing` — the guard, and the exact regression that
       motivated it: a held ramp once rewrote the same dB ~600 times in ten seconds (AC-02)
+- [ ] `test_the_guard_compares_the_optimistic_value_not_the_confirmed_one` — with a write still
+      unconfirmed, a second write of the same value is still suppressed. Comparing against the
+      confirmed value instead would let a ramp through for up to 2 s and defeat the guard (Q5)
+- [ ] `test_writing_while_disconnected_raises` — never queued for silent later delivery, which
+      would reintroduce the stale-command bug from the other direction (AC-20, Q6)
 - [ ] `test_a_read_only_client_refuses_every_write` — parametrised over every writable path,
       asserting nothing reached the transport (AC-18)
 - [ ] `test_writes_to_one_path_coalesce_to_the_last_value` (AC-05)
@@ -98,11 +109,24 @@ Driven by an injected fake transport and a controllable clock; no socket.
       verbs, empty frames (AC-16)
 - [ ] `test_stop_is_idempotent_and_cancels_every_timer`
 
+### `scripts/probe_htp1.py` — the read-only probe
+
+- [ ] `test_the_probe_is_read_only_by_construction` — asserts the script never passes
+      `allow_writes=True` and never calls a write method. Source-level, like
+      `ha_somfy`'s `test_probe_safety.py`, because the guarantee must hold for a script nobody
+      is unit-testing line by line (AC-21)
+- [ ] `test_the_probe_summary_scrubs_site_data` — unit name, input labels, Dirac slot names and
+      serial are redacted in the default summary. Raw output is opt-in and goes to gitignored
+      `scripts/output/`
+
 ### Package hygiene
 
 - [ ] `test_the_client_package_imports_no_home_assistant` — walks `htp1/*.py` and asserts no
       `homeassistant` import. This is the property that keeps the suite runnable on Windows
       (AC-19)
+- [ ] `test_the_suite_installs_from_requirements_test` — asserts `aiohttp` is declared there
+      rather than arriving through `pytest-homeassistant-custom-component`, which is unusable on
+      the Windows dev box (Q7)
 
 ## Integration Tests
 

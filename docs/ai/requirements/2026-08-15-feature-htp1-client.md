@@ -45,7 +45,9 @@ Home Assistant instance that drives ~50 wall panels.
 **Secondary goals**
 
 4. A read-only probe script that answers the outstanding hardware questions (HW-02, HW-03,
-   HW-04, HW-07) before M2 encodes assumptions about them.
+   HW-04, HW-07) before M2 encodes assumptions about them. It needs two modes: a one-shot
+   `getmso` summary, and an **observe** mode that holds the socket open and prints pushes, which
+   is the only way to confirm a front-panel change propagates and to test assumption A5.
 5. A fake device with fault injection, so failure paths are testable without unplugging
    anything.
 
@@ -95,9 +97,9 @@ has a passing test**, not when the code looks right.
 | # | Acceptance criterion | Test |
 |---|---|---|
 | AC-01 | Connect/handshake is abandoned after 15 s | `test_handshake_timeout_fires_when_the_socket_never_upgrades` |
-| AC-02 | A write equal to the current mirrored value is not sent | `test_600_identical_volume_writes_send_nothing` |
-| AC-03 | dB↔fraction round-trips exactly for every integer dB, over several `(vpl, vph)` pairs | `test_every_db_survives_a_round_trip` |
-| AC-04 | Every exact `.5` tie rounds **down** | `test_ties_round_down_never_up` |
+| AC-02 | A write equal to the current **optimistic** value is not sent; see Q5 | `test_600_identical_volume_writes_send_nothing` |
+| AC-03 | dB→fraction→dB round-trips exactly for **every** integer dB, over `(-50,0)`, `(-80,10)` and `(-127,0)`. The fraction is an **unrounded float**; see Q4 | `test_every_db_survives_a_round_trip` |
+| AC-04 | Converting a fraction to dB rounds every exact `.5` tie **down** | `test_ties_round_down_never_up` |
 | AC-05 | Writes coalesce by path within the 50 ms window; last value wins; one `changemso` per flush | `test_writes_to_one_path_coalesce_to_the_last_value` |
 | AC-06 | An empty op array is never sent | `test_a_flush_with_nothing_to_say_sends_nothing` |
 | AC-07 | Only `replace` ops are emitted | `test_only_replace_operations_are_emitted` |
@@ -113,6 +115,8 @@ has a passing test**, not when the code looks right.
 | AC-17 | A no-op push produces an empty change set and notifies nobody | `test_a_push_that_changes_nothing_notifies_nobody` |
 | AC-18 | A read-only client refuses every write before sending a byte | `test_a_read_only_client_refuses_every_write` |
 | AC-19 | The package imports no Home Assistant | `test_the_client_package_imports_no_home_assistant` |
+| AC-20 | A write attempted while disconnected raises rather than queueing silently; see Q6 | `test_writing_while_disconnected_raises` |
+| AC-21 | The probe script never constructs a write-enabled client and never calls a write method | `test_the_probe_is_read_only_by_construction` |
 
 **Performance:** applying a `msoupdate` for an untracked path (e.g. `/status/raw/...`) must not
 walk the document — a dict lookup and at most two anchored regex matches. The ~38 KB `mso`
@@ -127,6 +131,8 @@ the two where a silent wrong answer is most likely, so both get exhaustive table
 
 - **Zero Home Assistant imports** in `htp1/`, and **zero runtime dependencies** beyond
   `aiohttp`, which Home Assistant already ships. `manifest.json` stays `requirements: []`.
+  `aiohttp` is nonetheless declared in `requirements-test.txt`, because the suite must install
+  and run on a machine where `pytest-homeassistant-custom-component` is not usable (Q7).
 - The `aiohttp.ClientSession` is **injected**, never created by the client, so the integration
   can hand it HA's managed session while tests hand it a throwaway.
 - Python 3.13+ / ruff `target-version = "py313"`. Local dev runs 3.14.5; CI runs 3.13.
@@ -181,6 +187,61 @@ opt-in. AC-18.
 
 **Q3 — Probe timing.** Resolved: `scripts/probe_htp1.py` ships in M1 and is run read-only
 against all five units at the end of the milestone, closing HW-02/03/04/07 before M2 begins.
+
+### Resolved during the Phase 2 review
+
+The review found four real defects in the criteria above. Each is recorded rather than quietly
+edited, because the reasoning is the part worth keeping.
+
+**Q4 — AC-03 was false as originally written, and the cause was a bad port.**
+
+The Control4 driver converts dB to an **integer percentage**, because that is what a Control4
+room volume endpoint takes. Porting that verbatim looked obviously right. It is not: Home
+Assistant's `volume_level` is a **float 0..1**, and forcing it through 101 integer steps loses
+information whenever the unit's range has more than 101 dB values.
+
+Measured, not argued:
+
+| Range | dB values | Round-trip failures via integer percent |
+|---|---|---|
+| −50..0 | 51 | 0 |
+| −80..+10 | 91 | 0 |
+| **−127..0** | **128** | **27** |
+
+The first failure is −125 dB → 2 % → −124 dB: a value that comes back one dB **louder** than it
+went in, which is the exact direction the tie rule exists to prevent. This is not hypothetical
+— a third-party HTP-1 integration documents the range as −127.5..0 dB, and `vpl`/`vph` are
+user-configurable on every unit (HW-04).
+
+**Resolved:** `db_to_fraction` returns an **unrounded float**. `round_half_down` applies **only**
+in `fraction_to_db`, where Home Assistant hands us an arbitrary float and the device needs an
+integer dB. Verified: zero round-trip failures across all three ranges. The tie rule remains
+load-bearing — 48 of the 101 round percentages a UI typically sends land on an exact half-dB
+over −50..0.
+
+**Q5 — AC-02 did not say what "already there" compares against.** Confirmed value or optimistic
+value are different behaviours: during a ramp the confirmed value lags by up to 2 s, so
+comparing against it would let a stream of writes through and defeat the guard.
+
+**Resolved:** compare against the **optimistic** value — the mirror with pending writes applied.
+That is what the Control4 driver does, and its comment explains the consequence: a same-value
+command arriving while a prior write is unconfirmed is swallowed, and self-heals via the 2 s
+reconcile.
+
+**Q6 — the behaviour of a write issued while disconnected was unspecified.** Queueing it would
+violate the "discard the queue on disconnect" invariant from the other direction: the write
+would land whenever the unit came back, possibly minutes later.
+
+**Resolved:** raise `Htp1WriteError` immediately. A service call that cannot be delivered should
+fail visibly. New AC-20.
+
+**Q7 — `aiohttp` was missing from `requirements-test.txt`.** `tests/` needs it, but it was only
+arriving transitively through `pytest-homeassistant-custom-component` — which is the one
+dependency deliberately *not* usable on the Windows dev box. A fresh Windows checkout would
+therefore have failed to run the suite that is supposed to run anywhere.
+
+**Resolved:** declared explicitly. It is not a *runtime* dependency — Home Assistant ships it,
+so `manifest.json` still declares `requirements: []`.
 
 ### Deferred, with owner
 
