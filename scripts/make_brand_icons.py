@@ -1,22 +1,24 @@
-"""Generate the brand icons HACS and the Home Assistant brands repository require.
+"""Generate `brand/icon.png` and `brand/icon@2x.png` from the supplied brand artwork.
 
-Run: python scripts/make_brand_icons.py
+    python scripts/make_brand_icons.py path/to/Monolith.png
 
-Produces `custom_components/ha_monolith_htp1/brand/icon.png` (256x256) and `icon@2x.png`
-(512x512), matching the Home Assistant brands specification: square PNG, RGBA, full-bleed.
+The source is the manufacturer's logo lockup — the monument mark, a rule beneath it, and the
+word MONOLITH — laid out wide on a near-black ground. Home Assistant renders an integration
+icon at roughly 48 pixels in the integrations list, where that whole lockup would be unusable:
+the word alone would be about four pixels tall. **Only the mark is used**, which is what a mark
+is for.
 
-The artwork is ORIGINAL and deliberately generic -- a volume gauge, not any manufacturer's
-logo or trademark. It exists so the HACS `brands` check passes from this repository (HACS
-looks for brand/icon.png here before falling back to the brands repo) and so there is
-something to submit when the home-assistant/brands pull request is raised. Replace it with
-better artwork whenever someone wants to; nothing depends on these exact pixels.
+The dark ground is kept rather than dropped for transparency. The artwork is white, so a
+transparent version would be invisible against any light theme. Keeping the brand's own ground
+is both faithful and legible on either theme.
 
-Everything is drawn at 8x and downsampled, because PIL has no antialiasing of its own.
+The wide source is not committed. It is the manufacturer's marketing asset and the repository
+only needs what it renders; run this against a local copy if the icons ever need regenerating.
 """
 
 from __future__ import annotations
 
-import math
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -24,72 +26,92 @@ from PIL import Image, ImageDraw
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BRAND_DIR = REPO_ROOT / "custom_components" / "ha_monolith_htp1" / "brand"
 
-SUPERSAMPLE = 8
-
-BACKGROUND = (26, 32, 44, 255)  # deep slate
-ACCENT = (245, 166, 35, 255)  # amber
-TRACK = (55, 65, 81, 255)  # muted slate, the unlit part of the gauge
-
-# The gauge is a 270-degree sweep with the gap at the bottom, and the pointer sits at about
-# two-thirds of travel -- a volume control that reads as "audio" rather than "settings" at
-# 24 px, where every finer detail disappears anyway.
-GAUGE_START_DEG = 135.0
-GAUGE_SWEEP_DEG = 270.0
-POINTER_FRACTION = 0.66
+# Sampled from the source's own background rather than guessed.
+GROUND = (18, 22, 23, 255)
+# How much of the square the mark spans. Enough to read at 48 px, with margin so the mark does
+# not collide with the rounded corners.
+MARK_SPAN = 0.66
+# Proportional corner radius, the usual app-icon treatment, so a dark tile does not sit as a
+# hard-edged square beside the rounded icons Home Assistant shows around it.
+CORNER = 0.18
+# Anything at or above this luminance is artwork; the ground sits near 20.
+INK = 200
 
 
-def _render(size: int) -> Image.Image:
-    s = size * SUPERSAMPLE
-    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
+def extract_mark(source: Image.Image) -> Image.Image:
+    """The monument and its rule, as white-on-transparent, tightly trimmed.
 
-    # Full-bleed rounded square. Home Assistant renders brand icons on varied backgrounds,
-    # so the icon carries its own.
-    draw.rounded_rectangle([0, 0, s - 1, s - 1], radius=int(s * 0.22), fill=BACKGROUND)
+    Bands of artwork are found by scanning rows, then the wordmark — always the last band, and
+    separated from the rule by a wide gap — is dropped.
+    """
+    grey = source.convert("L")
+    width, height = grey.size
+    pixels = grey.load()
 
-    centre = s / 2
-    radius = s * 0.29
-    width = int(s * 0.085)
-    box = [centre - radius, centre - radius, centre + radius, centre + radius]
+    rows = [any(pixels[x, y] >= INK for x in range(0, width, 2)) for y in range(height)]
+    bands: list[tuple[int, int]] = []
+    start: int | None = None
+    for y, filled in enumerate(rows):
+        if filled and start is None:
+            start = y
+        elif not filled and start is not None:
+            bands.append((start, y - 1))
+            start = None
+    if start is not None:
+        bands.append((start, height - 1))
+    if len(bands) < 2:
+        raise SystemExit(f"expected at least two bands of artwork, found {len(bands)}")
 
-    # PIL measures arcs clockwise from 3 o'clock, which is the mirror of the usual maths
-    # convention; the whole gauge is drawn in PIL's terms to avoid converting twice.
-    draw.arc(box, GAUGE_START_DEG, GAUGE_START_DEG + GAUGE_SWEEP_DEG, fill=TRACK, width=width)
-    draw.arc(
-        box,
-        GAUGE_START_DEG,
-        GAUGE_START_DEG + GAUGE_SWEEP_DEG * POINTER_FRACTION,
-        fill=ACCENT,
-        width=width,
+    # The mark is everything above the largest vertical gap: monument, then rule, then a wide
+    # space, then the word.
+    gaps = [(bands[i + 1][0] - bands[i][1], i) for i in range(len(bands) - 1)]
+    _, split = max(gaps)
+    top, bottom = bands[0][0], bands[split][1]
+
+    # White where the source is artwork, transparent elsewhere — so the ground's wave texture,
+    # which is noise at this size, does not come along.
+    region = grey.crop((0, top, width, bottom + 1))
+    mask = region.point(lambda v: 255 if v >= INK else 0, mode="L")
+    mark = Image.new("RGBA", region.size, (255, 255, 255, 0))
+    mark.putalpha(mask)
+    mark.paste((255, 255, 255, 255), (0, 0), mask)
+    return mark.crop(mark.getbbox())
+
+
+def render(mark: Image.Image, size: int) -> Image.Image:
+    span = int(size * MARK_SPAN)
+    scale = min(span / mark.width, span / mark.height)
+    scaled = mark.resize(
+        (max(1, round(mark.width * scale)), max(1, round(mark.height * scale))),
+        Image.LANCZOS,
     )
 
-    # Pointer, from just off centre out to just inside the gauge track.
-    angle = math.radians(GAUGE_START_DEG + GAUGE_SWEEP_DEG * POINTER_FRACTION)
-    inner, outer = s * 0.055, radius - width * 0.85
-    draw.line(
-        [
-            centre + inner * math.cos(angle),
-            centre + inner * math.sin(angle),
-            centre + outer * math.cos(angle),
-            centre + outer * math.sin(angle),
-        ],
-        fill=ACCENT,
-        width=int(width * 0.8),
+    tile = Image.new("RGBA", (size, size), GROUND)
+    tile.paste(scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2), scaled)
+
+    rounded = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(rounded).rounded_rectangle(
+        (0, 0, size - 1, size - 1), radius=int(size * CORNER), fill=255
     )
-
-    hub = s * 0.045
-    draw.ellipse([centre - hub, centre - hub, centre + hub, centre + hub], fill=ACCENT)
-
-    return img.resize((size, size), Image.LANCZOS)
+    tile.putalpha(rounded)
+    return tile
 
 
-def main() -> None:
+def main() -> int:
+    if len(sys.argv) != 2:
+        raise SystemExit(__doc__)
+    source = Image.open(sys.argv[1])
+    source.load()
+    mark = extract_mark(source)
+    print(f"mark extracted: {mark.width}x{mark.height} from {source.width}x{source.height}")
+
     BRAND_DIR.mkdir(parents=True, exist_ok=True)
-    for size, name in ((256, "icon.png"), (512, "icon@2x.png")):
-        path = BRAND_DIR / name
-        _render(size).save(path, "PNG", optimize=True)
-        print(f"wrote {path.relative_to(REPO_ROOT)} ({size}x{size})")
+    for name, size in (("icon.png", 256), ("icon@2x.png", 512)):
+        out = BRAND_DIR / name
+        render(mark, size).save(out, "PNG", optimize=True)
+        print(f"wrote {out.relative_to(REPO_ROOT)}  {size}x{size}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

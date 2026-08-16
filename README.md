@@ -1,4 +1,4 @@
-# HA Monolith HTP1
+# Monolith HTP-1
 
 A Home Assistant integration for the **Monoprice Monolith HTP-1** 16-channel AV processor,
 installable and updatable through [HACS](https://hacs.xyz).
@@ -68,8 +68,8 @@ You can change what "turn off" means per entry in the integration's options, inc
 
 1. In HACS, add `https://github.com/ajguerre1/ha-monolith-htp1` as a custom repository of
    category **Integration**.
-2. Install **HA Monolith HTP1** and restart Home Assistant.
-3. **Settings → Devices & services → Add integration → HA Monolith HTP1**, then enter the
+2. Install **Monolith HTP-1** and restart Home Assistant.
+3. **Settings → Devices & services → Add integration → Monolith HTP-1**, then enter the
    processor's address. Repeat once per unit.
 
 The address field accepts a pasted `http://` or `ws://` URL as well as a bare host.
@@ -81,7 +81,7 @@ document carries no MAC address anywhere — so Home Assistant cannot follow a u
 moves, and no amount of cleverness in the integration can change that. Give each processor a
 DHCP reservation or a static address.
 
-If a unit does move, **Settings → Devices & services → HA Monolith HTP1 → Reconfigure** updates
+If a unit does move, **Settings → Devices & services → Monolith HTP-1 → Reconfigure** updates
 the address. The unit is identified by serial number, so pointing an entry at a *different*
 processor is refused rather than silently re-targeting every entity in the room.
 

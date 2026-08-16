@@ -1,4 +1,4 @@
-"""The HA Monolith HTP1 integration.
+"""The Monolith HTP-1 integration.
 
 Control for Monoprice Monolith HTP-1 AV processors over the unit's WebSocket interface.
 

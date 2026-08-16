@@ -1,6 +1,6 @@
 {
   "domain": "ha_monolith_htp1",
-  "name": "HA Monolith HTP1",
+  "name": "Monolith HTP-1",
   "codeowners": [
     "@ajguerre1"
   ],
@@ -14,5 +14,5 @@
     "custom_components.ha_monolith_htp1"
   ],
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

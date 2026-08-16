@@ -1,4 +1,4 @@
-"""Constants for the HA Monolith HTP1 integration.
+"""Constants for the Monolith HTP-1 integration.
 
 Every non-obvious value carries a comment naming the measurement or the defect that produced it.
 Protocol facts were verified live on firmware 1.13.3 and 2.1.1 during an earlier driver
