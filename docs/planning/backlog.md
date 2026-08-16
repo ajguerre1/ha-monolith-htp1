@@ -31,7 +31,7 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 | ID | Pri | Item | Notes |
 |----|-----|------|-------|
 | `M5-04` | L | Replace the placeholder README screenshot section | Not blocking. Nothing shows what the integration looks like in use. |
-| `M5-02` | M | PR the brand icons to `home-assistant/brands` | Required for HACS default-list inclusion. The assets themselves now exist in-repo (`M0-02`), which is enough for the HACS action but **not** for the default list — that check requires the brands repository. Replace the placeholder artwork with something better first if anyone wants to. |
+| `M5-02` | M | PR the brand icons to `home-assistant/brands` | **Blocked: waiting on owner-supplied artwork.** The in-repo placeholder is enough for the HACS action but is not what should be published under the project's name. Needs a square PNG with a transparent background, supplied at 512×512 or larger; `icon.png` at 256 and `icon@2x.png` at 512 are generated from it. Legible at ~48 px, which is the size the integrations list actually renders. Avoid reproducing the manufacturer's own mark. |
 | `M5-03` | L | Submit to the HACS default list | Needs: passing HACS action with no ignores, passing hassfest, a release created *after* both pass, plus repo description and topics. |
 
 ---
