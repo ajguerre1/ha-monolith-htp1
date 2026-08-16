@@ -109,6 +109,34 @@ Driven by an injected fake transport and a controllable clock; no socket.
       verbs, empty frames (AC-16)
 - [ ] `test_stop_is_idempotent_and_cancels_every_timer`
 
+**State ownership — the pending overlay** (design §State ownership)
+
+- [ ] `test_a_rollback_does_not_clobber_a_newer_push` — write A, a genuine push sets B before
+      confirmation, reconcile fires. The result must be B, not the pre-write value. This is the
+      bug that writing optimistic values into the mirror would cause, and the reason `_pending`
+      is a separate overlay whose rollback is a deletion rather than a restore
+- [ ] `test_a_confirming_push_notifies_nobody` — the value already shown optimistically produces
+      an empty change set, so a confirmation round-trip costs zero entity writes
+- [ ] `test_a_clamped_value_settles_on_the_units_answer` — the unit replies with a different
+      value than requested; pending clears and listeners see the unit's number, not ours
+- [ ] `test_an_optimistic_write_notifies_immediately` — what makes a slider feel instant
+
+**Start and stop contract** (design §Start and stop contract)
+
+- [ ] `test_start_makes_one_attempt_and_raises` — with `wait_for_first_document=True` a failure
+      raises rather than entering the ladder, so Home Assistant owns setup retry and there are
+      never two competing backoff loops
+- [ ] `test_the_reconnect_ladder_only_starts_after_the_first_document`
+
+**Write contract** (design §Write contract)
+
+- [ ] `test_writing_an_unknown_path_raises` — the unit rejects an entire `changemso` if one op
+      targets a missing member, so one bad path would silently void every coalesced write in
+      that flush
+- [ ] `test_writing_none_raises` — `None` is also the queue's "not queued" sentinel
+- [ ] `test_writing_the_value_already_there_is_not_an_error` — returns successfully having sent
+      nothing (AC-02), rather than raising
+
 ### `scripts/probe_htp1.py` — the read-only probe
 
 - [ ] `test_the_probe_is_read_only_by_construction` — asserts the script never passes

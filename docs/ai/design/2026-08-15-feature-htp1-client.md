@@ -25,15 +25,22 @@ graph TD
     Models[models.py<br/>pure value semantics]
   end
 
+  subgraph Tools["M1 deliverables that are not shipped to users"]
+    Probe[scripts/probe_htp1.py<br/>read-only: summary + observe]
+    Fake[tools/fake-htp1.py<br/>real protocol + fault injection]
+  end
+
   Unit[("HTP-1<br/>ws://host/ws/controller")]
 
   Coordinator -->|async_write, add_listener| Client
+  Probe -->|allow_writes NEVER passed| Client
   Client -->|parse / encode| Protocol
   Client -->|apply_document, apply_ops| Mso
   Mso --> Models
   Client -->|aiohttp ClientSession, injected| Unit
   Unit -.->|msoupdate push| Client
   Client -.->|frozenset of changed fields| Coordinator
+  Fake -.->|stands in for the unit in tests| Client
 ```
 
 **Technology choices**
@@ -120,6 +127,75 @@ async def probe_host(session, host, timeout=15.0) -> ProbeResult   # one-shot, r
 `add_listener` returns its own unsubscribe callable, so the caller passes it straight to
 `self.async_on_remove(...)` and cannot leak a subscription.
 
+### State ownership: the mirror, the pending overlay, and who sees what
+
+The requirements say the guard compares the **optimistic** value (Q5) while the mirror holds
+device truth. Those are two different values for the same path, so the design must say where
+each lives. Left implicit, the obvious implementation — writing optimistic values straight into
+the mirror — has a rollback bug: if a genuine push for that path arrives while a write is
+unconfirmed, restoring the "previous" value on rollback would clobber the newer truth.
+
+**Two layers, one direction of authority:**
+
+```
+_mirror   : MsoMirror          device truth. Only apply_document / apply_ops write here.
+_pending  : dict[str, Any]     paths written but not yet confirmed. Never read by the mirror.
+
+optimistic(path) -> _pending.get(path, _mirror.get(path))
+```
+
+- **The guard** compares against `optimistic(path)`. During a ramp the confirmed value lags by
+  up to 2 s, so comparing device truth would let a stream of redundant writes through — which is
+  most of the point of the guard.
+- **Rollback is a deletion, not a restore.** The reconcile watchdog clears `_pending` and
+  re-issues `getmso`. Because nothing was ever written into the mirror, there is no stale value
+  to put back and no way to clobber a push that arrived in the meantime.
+- **Confirmation is by value, not by acknowledgement.** There is no reply to a `changemso`. A
+  path leaves `_pending` when a push sets the mirror to the value we asked for. If the unit
+  clamps or ignores our value, the push carries something different, `_pending` is cleared for
+  that path anyway, and the entity settles on the unit's answer — which is the correct outcome
+  and the reason dB is the truth.
+
+**Notification semantics.** Listeners receive the set of paths whose *optimistic* value changed:
+
+| Event | Notifies? |
+|---|---|
+| `async_write` accepted | Yes, immediately — this is what makes a slider feel instant |
+| Confirming push arrives with the value we asked for | No. The mirror assign is a no-op relative to what listeners already saw, so the change set is empty |
+| Push arrives with a *different* value (clamped, or someone else changed it) | Yes |
+| Reconcile rollback | Yes, if the re-read differs from what was shown optimistically |
+
+This is the first of the three change-gating layers, and it is why a confirmation round-trip
+costs zero entity writes in the common case.
+
+### Start and stop contract
+
+The requirements make HA the owner of setup-time retry while the client reconnects indefinitely
+(non-goal 4). Those conflict unless `async_start` has two behaviours, so it does:
+
+- `async_start(wait_for_first_document=True)` — **one** connect attempt under the 15 s timeout,
+  then await the first document. Raises `Htp1ConnectionError` / `Htp1TimeoutError` on failure
+  and starts **no** reconnect ladder. M2 maps that onto `ConfigEntryNotReady` and lets Home
+  Assistant own the retry cadence. Two competing backoff loops is a design smell.
+- After the first document, the supervisor task takes over and reconnects indefinitely with the
+  jittered ladder for the life of the entry.
+- `async_stop()` is idempotent, cancels every timer and the supervisor task, and must never
+  block Home Assistant shutdown.
+
+### Write contract
+
+`async_write` / `async_write_many` raise before touching the socket when:
+
+| Condition | Exception | Why not silent |
+|---|---|---|
+| Client is read-only (`allow_writes=False`) | `Htp1WriteError` | AC-18. The safety interlock is worthless if it fails quietly |
+| Not connected | `Htp1WriteError` | AC-20. Queueing would deliver the command minutes later into a room whose state has moved on — the same stale-command defect as replaying the queue, from the other direction |
+| Path is unknown to the mirror | `Htp1WriteError` | The unit rejects a whole `changemso` if one op targets a missing member, so one bad path would silently void every coalesced write in that flush |
+| Value is `None` | `Htp1WriteError` | No path this client writes accepts null, and `None` doubles as the queue's "not queued" sentinel |
+
+A write whose value already equals `optimistic(path)` is **not** an error — it returns
+successfully having sent nothing (AC-02).
+
 **Authentication:** none exists. The unit has no auth and no TLS. Network reachability *is*
 authority; nothing in this layer can change that, and the README says so plainly.
 
@@ -131,6 +207,13 @@ authority; nothing in this layer can change that, and the README says so plainly
 | `models.py` | `db_to_fraction`, `fraction_to_db`, `round_half_down`, `InputInfo`, `DiracSlot`, `Versions`, codecs | no | Pure functions; the likeliest place for a silent wrong answer, so exhaustively table-tested |
 | `mso.py` | `MsoMirror.apply_document`, `.apply_ops`, `.get`, `.has`; `TRACKED_PATHS`, `CONTAINER_PREFIXES` | yes (the mirror) | The only module a firmware change forces you to edit |
 | `client.py` | socket, handshake timeout, keepalive, backoff, write queue, reconcile, parse budget, read-only interlock | yes | The only module doing I/O |
+| `scripts/probe_htp1.py` | Two read-only modes: `summary` (connect, `getmso`, print a scrubbed digest, disconnect) and `observe` (hold the socket, print pushes until interrupted) | — | Not shipped to users; it is how HW-02/03/04/07 get answered. **Never passes `allow_writes`**, and AC-21 asserts that at source level |
+| `tools/fake-htp1.py` | A local server speaking the real protocol from an invented document, with fault injection | — | Not shipped. Faults: `accept-tcp-no-upgrade`, `trickle`, `ignore-ping`, `bare-json`, `never-confirm`, `container-replace`, `garbage`, `no-videostat`, `no-serial`, `drop-mid-frame` |
+
+`accept-tcp-no-upgrade` deserves its own note: it is the **only** way to prove AC-01, and the
+defect it models — a unit binding port 80 before `/ws/controller` is live — wedged the Control4
+driver permanently. A fault injector that cannot produce it would leave the single most
+dangerous failure path untested.
 
 **Exception hierarchy** — `Htp1Error` → `Htp1ConnectionError`, `Htp1TimeoutError`,
 `Htp1ProtocolError`, `Htp1WriteError`. M2 maps these onto `ConfigEntryNotReady` and
@@ -196,3 +279,40 @@ authority; nothing in this layer can change that, and the README says so plainly
 **Scalability:** five clients in one event loop, each with one socket and one 50 ms timer. The
 constraint is not throughput but **state-change fan-out** to ~50 wall panels, which is why the
 mirror returns only fields that actually moved.
+
+## Requirements Coverage
+
+Checked against `docs/ai/requirements/2026-08-15-feature-htp1-client.md` during the Phase 3
+review. Everything below is now covered; the four rows marked **added in review** were genuine
+holes, not restatements.
+
+| Requirement | Covered by |
+|---|---|
+| Goal 1 — offline-testable, no HA imports | Module table; injected session; injected transport and clock |
+| Goal 2 — port the Control4 invariants | Design Decisions table; Reliability table |
+| Goal 3 — safe by construction | Read-only default; Write contract **(added in review)** |
+| Goal 4 — probe script, two modes | `scripts/probe_htp1.py` component **(added in review)** |
+| Goal 5 — fake device with fault injection | `tools/fake-htp1.py` component **(added in review)** |
+| Story — one object stays connected and reports change | `add_listener`; Start/stop contract **(added in review)** |
+| Story — write by pointer, coalesced | `async_write`; 50 ms coalescing; Write contract |
+| Story — a missing path disables one feature | Absence tolerance; codecs; conditional fields |
+| Story — suite runs on Windows | No HA imports; `aiohttp` declared in `requirements-test.txt` |
+| Story — cannot write unless enabled | `allow_writes=False` default |
+| Story — prove the 15 s timeout | `accept-tcp-no-upgrade` fault |
+| Edge cases (all 8) | Push handling order; Reliability table |
+| AC-01..AC-19 | Reliability table, push handling order, Design Decisions |
+| AC-20 — write while disconnected raises | Write contract **(added in review)** |
+| AC-21 — probe read-only by construction | Probe component; source-level assertion |
+| Constraint — `heartbeat` deviation | Design Decisions |
+| Constraint — privacy of site data | Security; probe prints a scrubbed digest by default |
+| Q4 — unrounded fraction | Design Decisions |
+| Q5 — guard compares optimistic | State ownership **(added in review)** |
+| Q6 — disconnected write raises | Write contract **(added in review)** |
+
+**Requirements gaps found:** none. Nothing in the requirements doc lacked a home; the failures
+were all in the *other* direction — deliverables and contracts the requirements named that the
+design had not described.
+
+**Remaining assumptions carried into implementation:** A5 (bare-JSON payloads, inherited and
+unobserved — tolerated regardless), and `/eq/tc`'s JSON type (HW-02, declared `BoolCodec` with a
+warn-once mismatch check until the probe measures it).
