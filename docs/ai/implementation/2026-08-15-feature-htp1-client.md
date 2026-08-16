@@ -19,7 +19,8 @@ in the planning doc.
 | T4 `mso.py` + `options.py` | **done** | 37 mirror tests + 20 option tests; 160 total green; ruff clean |
 | T5 client: transport | **done** | 23 tests; 183 total green; slowest test 0.04 s. Two API warts raised at review and fixed |
 | T6 client: read path | **done** | 17 tests; 200 total green. Budget guard demonstrated against a deliberately broken implementation |
-| T7 client: write path | todo | |
+| T7a client: queue, guard, interlock | **done** | 26 tests; 226 total green |
+| T7b client: pending overlay, reconcile | todo | |
 | T8 fake device | todo | |
 | T9 integration tests | todo | |
 | T10 probe script | todo | |
@@ -298,6 +299,29 @@ entity on the unit.
 and the fault was in `tests/fakes.py`, not the client: closing a held-open socket left
 `receive()` waiting on a gate nobody would set again, so the test hung rather than exercising
 the reconnect. A fake that cannot disconnect makes every reconnect test vacuous.
+
+### T7a — `client.py`, write path: queue, guard, interlock
+
+Split from T7b deliberately: the planning doc flagged T7 as the densest task and said to split
+the reconcile watchdog out rather than rush it.
+
+**Writable paths are an allowlist, not "everything tracked".** `/status/*`, `/videostat/*` and
+`/versions/*` are what the unit reports about itself. The unit rejects an entire `changemso` if
+one operation targets a member it does not have, so a single bad path silently voids every other
+write coalesced into the same flush — which makes a permissive check actively dangerous rather
+than merely untidy.
+
+**The guard compares against queue-then-mirror.** Comparing against the mirror alone would let a
+second write of an already-queued value through, because the mirror does not learn the value
+until the unit echoes it back. Sent-but-unconfirmed values need the pending overlay, which is
+T7b — the scope boundary is stated in the test module's docstring so nobody reads the guard as
+complete.
+
+**Values are encoded at flush, not at queue time.** The queue holds Python values so the guard
+can compare like with like; `/loudness` becomes `"on"` only on the way out.
+
+**The queue is discarded in `_teardown`**, which every disconnect path already runs through, so
+there is no route that reconnects with stale operations still pending.
 
 ### Patterns
 

@@ -27,13 +27,13 @@ import asyncio
 import contextlib
 import logging
 import random
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from aiohttp import WSMsgType
 
 from . import protocol
-from .mso import MsoMirror
+from .mso import TRACKED_PATHS, WRITABLE_INPUT_DELAY, WRITABLE_PATHS, MsoMirror
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +41,11 @@ DEFAULT_CONNECT_TIMEOUT = 15.0
 DEFAULT_HEARTBEAT = 30.0
 DEFAULT_BACKOFF: tuple[float, ...] = (2.0, 4.0, 8.0, 16.0, 30.0, 60.0)
 DEFAULT_JITTER_RATIO = 0.2
+
+# Operations are collected for this long and flushed as one message, the same coalescing
+# the vendor's own web client performs. It is what keeps a slider drag from becoming a
+# message per pixel.
+DEFAULT_FLUSH_DELAY = 0.05
 
 # A parse failure means the unit sent bytes this client could not decode as its own protocol;
 # the ~38 KB document is the realistic case. Below this many consecutive failures the fastest
@@ -89,6 +94,7 @@ class Htp1Client:
         heartbeat: float = DEFAULT_HEARTBEAT,
         backoff: tuple[float, ...] = DEFAULT_BACKOFF,
         jitter_ratio: float = DEFAULT_JITTER_RATIO,
+        flush_delay: float = DEFAULT_FLUSH_DELAY,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._session = session
@@ -98,6 +104,7 @@ class Htp1Client:
         self._heartbeat = heartbeat
         self._backoff = backoff
         self._jitter_ratio = jitter_ratio
+        self._flush_delay = flush_delay
         self._sleep = sleep or asyncio.sleep
 
         # Per-client generator. Seeding the global one would be a house-wide side effect.
@@ -111,6 +118,8 @@ class Htp1Client:
         self._backoff_index = 0
         self._parse_failures = 0
         self._listeners: list[Callable[[frozenset[str]], None]] = []
+        self._queue: dict[str, Any] = {}
+        self._flush_task: asyncio.Task[None] | None = None
 
     # -- properties ----------------------------------------------------------------------
 
@@ -235,6 +244,95 @@ class Htp1Client:
                 detail,
             )
         # Past the cap, dropped on the floor. Silence is the point.
+
+    # -- writing -------------------------------------------------------------------------
+
+    async def async_write(self, path: str, value: Any) -> None:
+        """Queue one change, or raise before a byte is sent.
+
+        A value already in effect is **not** an error: it returns having sent nothing. That is
+        the guard, and without it a ramp held against the end of the volume range rewrote the
+        same dB about six hundred times over a ten-second hold.
+        """
+        await self.async_write_many({path: value})
+
+    async def async_write_many(self, pairs: Mapping[str, Any]) -> None:
+        """Queue several changes. They flush together, as one `changemso`."""
+        if not pairs:
+            return
+        for path, value in pairs.items():
+            self._check_writable(path, value)
+        for path, value in pairs.items():
+            # Already there, so writing again would be noise on the wire and in the room.
+            if self._optimistic(path) == value:
+                continue
+            self._queue[path] = value
+        self._schedule_flush()
+
+    def _check_writable(self, path: str, value: Any) -> None:
+        """Every reason a write is refused before anything is sent."""
+        if not self._allow_writes:
+            raise Htp1WriteError(
+                f"this client is read-only; construct it with allow_writes=True to change "
+                f"{self._host}"
+            )
+        if not self.connected:
+            raise Htp1WriteError(
+                f"not connected to {self._host}; refusing to queue {path} for later delivery"
+            )
+        if value is None:
+            raise Htp1WriteError(f"{path} cannot be set to None")
+        if path not in WRITABLE_PATHS and not WRITABLE_INPUT_DELAY.match(path):
+            raise Htp1WriteError(f"{path} is not a path this integration may write")
+
+    def _optimistic(self, path: str) -> Any:
+        """What this path is believed to hold: queued value first, then device truth.
+
+        Comparing against device truth alone would let a second write of an already-queued
+        value through, because the mirror does not learn the new value until the unit echoes
+        it back.
+        """
+        if path in self._queue:
+            return self._queue[path]
+        field = TRACKED_PATHS.get(path)
+        return self._mirror.get(field.name) if field else None
+
+    def _schedule_flush(self) -> None:
+        if self._queue and (self._flush_task is None or self._flush_task.done()):
+            self._flush_task = asyncio.create_task(self._flush_after_delay())
+
+    async def _flush_after_delay(self) -> None:
+        """Collect for one window, then send the lot as a single message."""
+        await self._sleep(self._flush_delay)
+        await self._flush()
+
+    async def _flush(self) -> None:
+        queued, self._queue = self._queue, {}
+        if not queued or not self.connected:
+            return
+        ops = [
+            protocol.replace_op(path, self._encode(path, value)) for path, value in queued.items()
+        ]
+        try:
+            await self._ws.send_str(protocol.encode_change(ops))
+        except Exception as err:
+            _LOGGER.debug("write to %s failed: %s", self._host, err)
+
+    @staticmethod
+    def _encode(path: str, value: Any) -> Any:
+        """Python value to wire value. `/loudness` is "on"/"off"; `/muted` is a real boolean."""
+        field = TRACKED_PATHS.get(path)
+        if field is not None and field.codec is not None:
+            return field.codec.encode(value)
+        return value
+
+    def _discard_queue(self) -> None:
+        """Drop anything queued. Called on every disconnect.
+
+        Replaying it after a reconnect would apply a stale command minutes later, to a room
+        whose state has moved on.
+        """
+        self._queue = {}
 
     # -- backoff -------------------------------------------------------------------------
 
@@ -374,6 +472,7 @@ class Htp1Client:
             await self._teardown()
 
     async def _teardown(self) -> None:
+        self._discard_queue()
         connection, self._connection = self._connection, None
         self._ws = None
         if connection is not None:

@@ -111,6 +111,34 @@ CONTAINER_PREFIXES = frozenset(
     }
 )
 
+# Paths this integration may write. Deliberately an allowlist rather than "everything tracked":
+# `/status/*`, `/videostat/*` and `/versions/*` are what the unit reports about itself, and
+# writing one would at best be ignored. The unit rejects an entire `changemso` if a single
+# operation targets a member it does not have, so one bad path silently voids every other write
+# coalesced into the same flush.
+WRITABLE_PATHS = frozenset(
+    {
+        "/volume",
+        "/muted",
+        "/powerIsOn",
+        "/powerAction",
+        "/input",
+        "/upmix/select",
+        "/loudness",
+        "/bassenhance",
+        "/eq/tc",
+        "/night",
+        "/dialogEnh",
+        "/cal/currentdiracslot",
+        "/cal/diracactive",
+        "/cal/lipsync",
+    }
+)
+
+# Per-input delay is writable too, and is not a tracked scalar: the vendor's own client writes
+# `/cal/lipsync` and `/inputs/<current input>/delay` together.
+WRITABLE_INPUT_DELAY = re.compile(r"^/inputs/[^/]+/delay$")
+
 _INPUT_LEAF = re.compile(r"^/inputs/([^/]+)/(label|visible)$")
 _UPMIX_HOMEVIS = re.compile(r"^/upmix/([^/]+)/homevis$")
 _SLOT_LEAF = re.compile(r"^/cal/slots/(\d+)(?:/name)?$")
