@@ -365,23 +365,35 @@ Driven by an injected fake transport and a controllable clock; no socket.
       rather than arriving through `pytest-homeassistant-custom-component`, which is unusable on
       the Windows dev box (Q7)
 
-## Integration Tests
+## Integration Tests (T8, T9) — **complete**
 
-Against `tools/fake-htp1.py`, over a real loopback socket.
+Against `tools/fake_htp1.py`, over a real loopback socket with a real `aiohttp.ClientSession`.
+13 tests, 1.4 s for the whole suite including these.
 
-- [ ] `test_connect_getmso_and_first_document` — the happy path end to end
-- [ ] `test_a_write_is_echoed_back_as_msoupdate` — the fake broadcasts applied ops, as the real
-      unit does to every connected client
-- [ ] `test_the_handshake_timeout_fires_against_accept_tcp_no_upgrade` — **the single most
-      valuable fault in the set.** It is the only way to prove AC-01, and the defect it models
-      wedged the Control4 driver permanently
-- [ ] `test_a_trickled_document_reassembles` — one byte per write
-- [ ] `test_an_ignored_ping_is_detected_and_reconnects`
-- [ ] `test_a_never_confirmed_write_triggers_the_reconcile`
-- [ ] `test_a_container_replace_from_the_wire_rederives_leaves`
-- [ ] `test_garbage_frames_exhaust_the_budget_then_go_quiet`
-- [ ] `test_a_document_without_a_serial_still_connects`
-- [ ] `test_the_wrong_path_is_refused` — the unit closes 1008 on anything but `/ws/controller`
+- [x] `test_connect_get_document_and_disconnect` — the happy path end to end
+- [x] `test_a_write_comes_back_as_a_push` — the fake broadcasts applied ops, as the real unit
+      does to every connected client
+- [x] `test_a_front_panel_change_arrives_unrequested` — nothing is asked for; this is why we
+      never poll
+- [x] `test_junk_input_is_rejected_and_the_connection_survives`
+- [x] `test_the_handshake_timeout_fires_against_a_socket_that_never_upgrades` — **the single
+      most valuable fault in the set** (AC-01). The only end-to-end proof, and the defect it
+      models wedged the Control4 driver permanently
+- [x] `test_the_wrong_path_is_refused` — closed with 1008 on anything but `/ws/controller`
+- [x] `test_a_document_that_never_decodes_exhausts_the_budget_and_goes_quiet`
+- [x] `test_bare_json_payloads_are_understood`
+- [x] `test_a_container_replace_from_the_wire_rederives_leaves`
+- [x] `test_an_unconfirmed_write_is_rolled_back`
+- [x] `test_firmware_without_a_video_block_loses_only_those_fields`
+- [x] `test_a_unit_without_a_serial_still_connects`
+- [x] `test_a_dropped_connection_is_re_established`
+
+> **Two scenarios dropped, with reasons.** `test_a_trickled_document_reassembles` and
+> `test_an_ignored_ping_is_detected_and_reconnects` tested RFC 6455 fragment reassembly and the
+> pong deadline. The Control4 driver needed both because it hand-wrote its own codec; here
+> aiohttp owns framing and derives the pong deadline from `heartbeat`, so these would test
+> aiohttp rather than anything in this repository. `close-after-document` reaches the same
+> recovery path, and `test_a_dropped_connection_is_re_established` covers it.
 
 ## End-to-End Tests
 

@@ -17,7 +17,7 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 - [x] **M1.A Foundations** — fixtures and the Windows-safe test harness (T1)
 - [x] **M1.B Pure layers** — `protocol.py`, `models.py`, `mso.py`, `options.py` (T2–T4)
 - [ ] **M1.C The client** — transport, read path, write path (T5–T7)
-- [ ] **M1.D Tools** — fake device, integration tests, probe script (T8–T10)
+- [ ] **M1.D Tools** — fake device ✅, integration tests ✅, probe script (T8–T10)
 - [ ] **M1.E Measure** — read-only probe of all five units; close HW-02/03/04/07 (T11)
 - [ ] **M1.F Reconcile** — backlog, memory, docs (T12)
 
@@ -33,7 +33,9 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 | T6 client: read path | **done** | Budget guard demonstrated against a broken build, not assumed |
 | T7a client: queue, guard, interlock | **done** | Split as the plan advised rather than landing T7 as one change |
 | T7b client: pending overlay, reconcile | **done** | Disproved a design claim about notification; design corrected |
-| T8 fake device | next | |
+| T8 fake device | **done** | 8 faults; two bugs in the fake itself would have made tests lie |
+| T9 integration tests | **done** | Found the missing parse budget in `_read_until_document`, which no in-process fake could have surfaced |
+| T10 probe script | next | |
 | T8–T10 tools | not started | |
 | T11 probe live | **blocked — needs approval**, by design | |
 | T12 reconcile | not started | |

@@ -21,8 +21,8 @@ in the planning doc.
 | T6 client: read path | **done** | 17 tests; 200 total green. Budget guard demonstrated against a deliberately broken implementation |
 | T7a client: queue, guard, interlock | **done** | 26 tests; 226 total green |
 | T7b client: pending overlay, reconcile | **done** | 15 tests; 241 total green. Corrected a design claim about notification |
-| T8 fake device | todo | |
-| T9 integration tests | todo | |
+| T8 fake device | **done** | `tools/fake_htp1.py`, 8 faults, usable as a CLI and importable by tests |
+| T9 integration tests | **done** | 13 tests over loopback; found a real gap in the client |
 | T10 probe script | todo | |
 | T11 probe the five units (read-only, **gated on approval**) | todo | |
 | T12 reconcile | todo | |
@@ -358,6 +358,40 @@ diverged from.
 **Rollback always notifies**, rather than only when the re-read differs as the design suggested.
 The client cannot know what an entity displayed, and an entity stuck showing a value the unit
 never adopted — with nothing to correct it — is the worse failure.
+
+### T8, T9 — the fake device and integration tests
+
+`tools/fake_htp1.py` speaks the real protocol over a real socket. Named with an underscore,
+unlike the Lua project's `fake-htp1.py`, so the tests can import it rather than shell out.
+
+**A real gap in the client, found here and nowhere else.** `_read_until_document` had no parse
+budget, so a unit whose document never decodes left *setup* waiting for a reply that would never
+come — the read loop's cap only applied afterwards. The only thing that would eventually have
+noticed is Home Assistant's own timeout. It now applies the same budget and raises
+`Htp1ProtocolError`. This is exactly the class of defect an in-process fake cannot surface,
+because the in-process fake only ever replays messages the test already decided were sensible.
+
+**A second gap, in the client's shape rather than its behaviour.** The URL hardcoded port 80
+with no seam, so the client could not be pointed at a loopback server at all. Now a `port`
+parameter defaulting to 80. The device is always on 80, but a transport that cannot be tested
+over loopback is worse than one with a parameter nobody changes.
+
+**Two faults from the Control4 set are deliberately absent.** `trickle` and `drop-mid-frame`
+tested RFC 6455 fragment reassembly, which that driver needed because it hand-wrote its codec.
+Here aiohttp owns framing, so those would be testing aiohttp. Same for suppressing a pong: the
+deadline is aiohttp's. Recorded in the tool's own docstring so the omission reads as a decision
+rather than an oversight.
+
+**Two bugs in the fake itself**, both of which would have made tests lie:
+
+1. `Server.wait_closed()` waits for handler tasks since Python 3.12, and the hang handler never
+   returned — so stopping the fake hung the suite. The handler now waits on a shutdown event.
+2. `never-confirm` originally applied the change and merely withheld the echo, which left the
+   client's optimistic value *correct* and gave the watchdog nothing to correct. It now drops
+   the write entirely, which is the fault worth modelling.
+
+The startup banner is flushed, because the usual caller is a script waiting to learn the port
+and Python buffers stdout when it is a pipe.
 
 ### Patterns
 

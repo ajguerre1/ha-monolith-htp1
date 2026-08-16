@@ -103,6 +103,7 @@ class Htp1Client:
         session: Any,
         host: str,
         *,
+        port: int = WS_PORT,
         seed: Any = None,
         allow_writes: bool = False,
         connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
@@ -115,6 +116,7 @@ class Htp1Client:
     ) -> None:
         self._session = session
         self._host = host
+        self._port = port
         self._allow_writes = allow_writes
         self._connect_timeout = connect_timeout
         self._heartbeat = heartbeat
@@ -149,7 +151,7 @@ class Htp1Client:
 
     @property
     def url(self) -> str:
-        return f"ws://{self._host}:{WS_PORT}{WS_PATH}"
+        return f"ws://{self._host}:{self._port}{WS_PATH}"
 
     @property
     def connected(self) -> bool:
@@ -493,6 +495,13 @@ class Htp1Client:
             raise Htp1ConnectionError(f"cannot talk to {self._host}: {err}") from err
 
     async def _read_until_document(self) -> None:
+        """Wait for the first document, applying the same budget the read loop uses.
+
+        Without the budget here, a unit whose document never decodes leaves setup waiting for a
+        reply that will never come, and the only thing that eventually notices is Home
+        Assistant's own timeout. Found by the fake-device integration tests, which is exactly
+        the sort of thing an in-process fake cannot show you.
+        """
         while True:
             message = await self._receive()
             if message is None:
@@ -500,8 +509,17 @@ class Htp1Client:
                     f"{self._host} closed the connection before sending a document"
                 )
             if message.kind is protocol.MessageKind.DOCUMENT:
+                self._parse_failures = 0
                 self._mirror.apply_document(message.document)
                 return
+            if message.kind is protocol.MessageKind.MALFORMED:
+                self._parse_failures += 1
+                if self._parse_failures >= MAX_PARSE_FAILURES:
+                    raise Htp1ProtocolError(
+                        f"{self._host} sent {MAX_PARSE_FAILURES} undecodable replies to "
+                        f"getmso; giving up rather than re-reading at line rate"
+                    )
+                await self._request_document()
 
     async def _receive(self) -> protocol.ParsedMessage | None:
         """One decoded frame, or None when the link is gone."""
