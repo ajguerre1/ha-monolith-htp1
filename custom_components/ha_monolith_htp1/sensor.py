@@ -11,6 +11,10 @@ content transition, and with five units feeding roughly fifty wall panels that i
 fan-out for something nobody automates on. Anyone who wants one enables it in the entity
 settings, which is exactly what the entity registry is for — and why this is not an option in
 the config flow.
+
+Every sensor here describes a **live signal**, which is why `native_value` blanks all of them
+when the unit reports itself off. See the note there: the unit does not stop describing a
+soundtrack just because it went to sleep.
 """
 
 from __future__ import annotations
@@ -133,7 +137,29 @@ class Htp1Sensor(Htp1Entity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        return self.coordinator.mirror.get(self.entity_description.field)
+        """`None` whenever the reading cannot mean anything.
+
+        Two ways that happens, both measured on firmware 2.1.2 on 2026-08-16.
+
+        A sleeping unit keeps reporting the last thing it decoded. Asleep, it still claimed
+        `Dolby Surround` and `5.1.2` — and pushed listening-format changes twice inside a
+        twenty-second window. Showing that is worse than showing nothing: a dark processor
+        would sit on a wall panel announcing a soundtrack. Blanking also means those pushes
+        stop reaching the panels at all, because every one of them now compares equal.
+
+        And a field the unit has no reading for is filled with dashes, whose width follows the
+        field rather than the meaning — `--`, `---`, `-----`. Only-dashes is not a reading.
+        The test is deliberately "nothing but dashes and spaces" rather than "contains a dash",
+        so a real value like `1920x1080p-60` still reports itself.
+        """
+        # `is False` and not a falsy test: a firmware that never reports power must not blank
+        # every sensor it does report.
+        if self.coordinator.optimistic("/powerIsOn") is False:
+            return None
+        value = self.coordinator.mirror.get(self.entity_description.field)
+        if isinstance(value, str) and not value.strip(" -"):
+            return None
+        return value
 
     def _state_snapshot(self) -> tuple:
         return (*super()._state_snapshot(), self.native_value)

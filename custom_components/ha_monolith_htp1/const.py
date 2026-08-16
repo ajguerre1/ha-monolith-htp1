@@ -39,8 +39,11 @@ POWER_OFF_ACTIONS: Final = (POWER_OFF_SLEEP, POWER_OFF_SHUTDOWN, POWER_OFF_NOTHI
 DEFAULT_POWER_OFF_ACTION: Final = POWER_OFF_SLEEP
 
 # Sleep keeps the network, so `TURN_ON` is a real capability rather than a button that cannot
-# work. This is the vendor's documented behaviour and the owner's experience of these units; we
-# have measured the *shutdown* half directly but not yet the sleep half. HW-01b tracks that.
+# work. Measured 2026-08-16 on the lab unit: nine of nine *fresh* sockets opened during ninety
+# seconds of sleep returned a full document, and `/powerIsOn: true` woke it remotely with
+# volume, input and mute untouched. Fresh sockets rather than a held one on purpose — a
+# half-open connection looks alive from this side for minutes, and the question that matters is
+# whether Home Assistant can reach a unit it is not already talking to, after a restart.
 SLEEP_KEEPS_NETWORK: Final = True
 
 # Shutdown ends communication until someone walks to the unit. Measured, not inferred. This is

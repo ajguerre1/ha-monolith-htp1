@@ -242,6 +242,102 @@ async def test_an_absent_field_reads_unknown_rather_than_unavailable(
         assert state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
 
+async def test_a_sleeping_unit_reports_no_signal(hass, config_entry, mock_client):
+    """Measured 2026-08-16: asleep, the unit still claimed `Dolby Surround` and `5.1.2`.
+
+    It is reachable and answering — so the entities are available, not unavailable — but what
+    it is saying describes a soundtrack it stopped playing. A wall panel showing that is the
+    defect this closes.
+    """
+    await _setup(hass, config_entry, mock_client)
+    assert hass.states.get("sensor.test_processor_surround_mode").state == "Native Dolby ATMOS"
+
+    mock_client.mirror.apply_ops([{"op": "replace", "path": "/powerIsOn", "value": False}])
+    _push(hass, mock_client, {"power"})
+    await hass.async_block_till_done()
+
+    for entity_id in (
+        "sensor.test_processor_surround_mode",
+        "sensor.test_processor_listening_format",
+        "sensor.test_processor_source_format",
+        "sensor.test_processor_video_resolution",
+    ):
+        assert hass.states.get(entity_id).state == STATE_UNKNOWN, entity_id
+
+
+async def test_waking_restores_the_readings(hass, config_entry, mock_client):
+    """Blanking must be a view of the power state, not something that latches."""
+    await _setup(hass, config_entry, mock_client)
+    mock_client.mirror.apply_ops([{"op": "replace", "path": "/powerIsOn", "value": False}])
+    _push(hass, mock_client, {"power"})
+    await hass.async_block_till_done()
+
+    mock_client.mirror.apply_ops([{"op": "replace", "path": "/powerIsOn", "value": True}])
+    _push(hass, mock_client, {"power"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_surround_mode").state == "Native Dolby ATMOS"
+
+
+@pytest.mark.parametrize("placeholder", ["--", "---", "-----", "", "   ", " -- "])
+async def test_a_field_of_dashes_is_not_a_reading(hass, config_entry, mock_client, placeholder):
+    """The unit pads an empty field with dashes as wide as the field. `-----` is not a value."""
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops(
+        [{"op": "replace", "path": "/videostat/VideoResolution", "value": placeholder}]
+    )
+    _push(hass, mock_client, {"video_resolution"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_video_resolution").state == STATE_UNKNOWN
+
+
+async def test_a_real_value_containing_a_dash_survives(hass, config_entry, mock_client):
+    """The rule is *nothing but* dashes. Resolutions and frame rates use them legitimately."""
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops(
+        [{"op": "replace", "path": "/videostat/VideoResolution", "value": "1920x1080p-60"}]
+    )
+    _push(hass, mock_client, {"video_resolution"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_video_resolution").state == "1920x1080p-60"
+
+
+async def test_a_sleeping_unit_that_keeps_talking_moves_no_panel(hass, config_entry, mock_client):
+    """The reason blanking is worth doing, not just the honesty of it.
+
+    A sleeping unit pushed `listening_format` twice in twenty seconds of observation. Each of
+    those would otherwise be a state write fanned out to roughly fifty panels, for a processor
+    nobody is listening to. Blanked, they all compare equal and stop at the entity.
+
+    Asserted on `last_reported` rather than the `last_updated` its neighbours use. Both readings
+    here are `unknown`, so a write that leaked through would produce an identical state and
+    leave `last_updated` alone — the very thing this is trying to catch. `last_reported` moves
+    on every write, identical or not, so it is the one that can tell "nothing was written" from
+    "the same thing was written again".
+    """
+    await _setup(hass, config_entry, mock_client)
+    mock_client.mirror.apply_ops([{"op": "replace", "path": "/powerIsOn", "value": False}])
+    _push(hass, mock_client, {"power"})
+    await hass.async_block_till_done()
+
+    before = hass.states.get("sensor.test_processor_listening_format").last_reported
+
+    for value in ("2.0.0", "5.1.2", "7.2.2"):
+        mock_client.mirror.apply_ops(
+            [{"op": "replace", "path": "/status/ENCListeningFormat", "value": value}]
+        )
+        _push(hass, mock_client, {"listening_format"})
+    await hass.async_block_till_done()
+
+    after = hass.states.get("sensor.test_processor_listening_format")
+    assert after.last_reported == before, "a sleeping unit's status churn reached the panels"
+    assert after.state == STATE_UNKNOWN
+
+
 # --------------------------------------------------------------------------------------
 # Change gating
 # --------------------------------------------------------------------------------------
