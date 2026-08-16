@@ -72,6 +72,9 @@ You can change what "turn off" means per entry in the integration's options, inc
 3. **Settings → Devices & services → Add integration → Monolith HTP-1**, then enter the
    processor's address. Repeat once per unit.
 
+<img src="docs/images/config-flow.png" alt="The Add a Monolith HTP-1 dialog, with a single
+Address field" width="520">
+
 The address field accepts a pasted `http://` or `ws://` URL as well as a bare host.
 
 ### Give each unit a fixed address
@@ -91,6 +94,9 @@ processor is refused rather than silently re-targeting every entity in the room.
 |---|---|---|
 | When turned off | Sleep | Sleep, Shut down, or Do nothing. |
 | Volume limit (dB) | none | Refuses to *send* above this level. Does not change what the processor reports. |
+
+<img src="docs/images/options.png" alt="The Options dialog, showing the When turned off
+selector set to Sleep and its explanation of sleep, shut down and do nothing" width="520">
 
 Changing an option does not reload the entry, so a healthy connection is not dropped and no
 entity blanks.

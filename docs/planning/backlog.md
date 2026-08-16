@@ -17,20 +17,24 @@ There is no separate issue tracker for this project. This file is the record.
 
 ## Open
 
-### Hardware questions — must be settled before v1.0 (M4)
+**Nothing.** Every hardware question is measured, every milestone shipped, and the integration
+is running on five processors.
 
-These need real units. All are read-only except where marked; writes go to the **designated lab
-unit only** (named in the gitignored `local/lab-unit.md`), after asking.
+Two things are outside this project's control and are not backlog items:
 
-| ID | Pri | Item | Method | Why it blocks |
-|----|-----|------|--------|---------------|
-| `HW-08` | L | Does a front-panel change propagate as an unrequested push? | Read-only `observe`, with someone at a unit | Not settled by the T11 run: nobody was at a panel, so 45 s of idle observation proved the *absence* of chatter but not the presence of propagation. An earlier driver observed it, so this is confirmation rather than discovery. |
+- The HACS default-list submission (`hacs/default` #10039) is queued and waiting on a human
+  reviewer. Its Hassfest check fails, as it does on every other open submission — that is
+  HACS's own harness, and our Hassfest passes in our CI.
+- `home-assistant/brands` no longer accepts custom integrations at all. See `M5-02`.
 
-### Build
+**When adding an item, keep the rules at the top of this file.** The one that has earned its
+place most often is the last: an item closes with a test name, a run number, or a live
+observation, and never with "it looks right".
 
-| ID | Pri | Item | Notes |
-|----|-----|------|-------|
-| `M5-04` | L | Replace the placeholder README screenshot section | Not blocking. Nothing shows what the integration looks like in use. |
+### Hardware questions — settled
+
+These needed real units. All were read-only except where marked; writes went to the
+**designated lab unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 
 ---
 
@@ -42,6 +46,8 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 | `M4-01` | **Cut over. Five units live on `ha_monolith_htp1`, `monoprice_htp1` removed** | 2026-08-16. Installed **through HACS** as a custom repository from release `v0.1.0` — `installed: true`, `installed_version: v0.1.0`, files under `/config/custom_components/ha_monolith_htp1/`, which proves requirement 4 end to end rather than asserting it. Five old entries removed, one restart (116 s), five entries added via the config flow, each titled from the unit's own name. **100 registry entities = 20 per unit, 70 enabled = 14 per unit**, matching `EXPECTED_ENTITIES` and `DISABLED_BY_DEFAULT` exactly. All five shutdown buttons `disabled_by=integration`. `supported_features=69004` = the seven intended flags including `TURN_ON`. Volume verified against the device: −43 dB over [−50, 0] reads 0.14. Devices placed in their five areas, so all 14 entities inherit an area — the thing the old integration could not do, having created no device at all. `media_player.htp1_<room>` ids reclaimed. **Log: one line, the standard "custom integration not tested" boilerplate. Zero errors from our code.** Diagnostics checked against a real unit, not a fixture: 5,888 bytes, no host, serial, unit name or input label. |
 | `M2-01` | Integration core: coordinator, entity base, config flow, diagnostics, strings | Feature `integration-core`. `tests/ha/test_init.py`, `test_config_flow.py`, `test_diagnostics.py`. Verified live in `M4-01`: `entry.runtime_data` in use, options change without reloading the entry, diagnostics redacted against a real unit. |
 | `M3-01` | Entity platforms, description-table driven | Feature `entity-platforms`. **Six platforms, not the five originally scoped** — `button` was added for shutdown once the power model was corrected. `test_the_entity_inventory_is_exactly_this` pins the ids; `M4-01` confirmed 14 enabled and 6 gated per unit across five live units. |
+| `HW-08` | **Changes made at a unit propagate unrequested, and reach entity state** | 600 s read-only watch across all five units plus Home Assistant's event stream, 2026-08-16. **325 unsolicited events**, including **42 `/volume` pushes across four units** that neither Home Assistant nor any script here originated. Home Assistant followed every one within ~100 ms. The clearest single trace is a unit going `0.40 → 0.42 → 0.40 → 0.38 → 0.40 → 0.38 → 0.36` inside three seconds — up, down, up, down — which is a rotary knob being turned, not a remote stepping monotonically and not an automation. The watcher was proved capable of seeing a change *before* the run, by triggering one from a third-party socket; a quiet run would otherwise be indistinguishable from a broken script, which is exactly how the T11 attempt failed. |
+| `M5-04` | README shows the integration in use | `docs/images/config-flow.png`, `docs/images/options.png`, both in the README. **Only surfaces that carry no site data by construction** — the Add-integration dialog and the Options dialog contain no room, unit or input name, so there is nothing to scrub and no chance of a redaction being missed. Re-encoded from raw pixels on the way in, since a screenshot can carry a window title or username in metadata even when the visible pixels are clean; both files verified to have no `info` keys and no EXIF. |
 | `M5-03` | **Submitted and queued.** `hacs/default` PR #10039 | Labelled `New default repository` by `hacs-bot` two seconds after opening, with the review-queue comment. Every substantive check passes — Preflight, Owner, Releases, Existing repository, Removed repository, HACS action, Editable PR, JQ, JSON schema, Sorted. **Hassfest fails, and fails identically on every other open submission checked (#10033, #10023, #9988): `No integrations found!` from HACS's own harness, which mounts the integration into a container. Our hassfest passes in our own CI.** Not actionable here. |
 | `M5-08` | The first attempt, #10038, was closed by the bot in four seconds — the links were blank | The template's three link fields were left as the literal `<>` placeholders, directly under its own warning: *"Do not open a pull request before you have provided all these, it will be closed."* The `ha-somfy` submission the same evening had them filled and was accepted, which is the controlled comparison. **The cause was handing the owner a bare compare URL with the links in a separate file rather than pre-filled into the body.** Three hypotheses were tested and disproved before finding it: branch naming (merged PRs use wildly varying names), PR title (the bot writes those itself), and concurrent submissions (eleven authors currently hold multiple open PRs — that one was disproved by the owner, not by me). GitHub refuses to reopen #10038 with a bare `422` despite the branch being intact and one commit ahead of master, so #10039 carries the owner's original body with the links filled in. |
 | `M5-02` | **Obsolete, and already satisfied.** No brands pull request is needed | `home-assistant/brands` stopped accepting pull requests for custom components; its PR template says so outright and points at the Brands Proxy API (HA 2026.3). Custom integrations now serve their own images from a `brand/` directory inside the integration, which this repo has shipped since `M0-02`. Verified live rather than assumed: `GET /api/brands/integration/ha_monolith_htp1/icon.png` returns HTTP 200 with a body whose SHA-256 matches the committed file byte for byte. **The task was built on a requirement that no longer exists.** |
