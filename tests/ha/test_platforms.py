@@ -96,15 +96,18 @@ async def test_a_firmware_without_video_gets_no_video_sensors(
 
     An entity that is permanently unknown is worse than one that does not exist: it looks
     broken rather than absent.
+
+    Matched by suffix rather than by full entity id, because the legacy fixture names its unit
+    differently and the device name is what the object id is built from.
     """
     mock_client.mirror = mso_legacy_mirror
     await _setup(hass, config_entry, mock_client)
 
-    assert hass.states.get("sensor.test_processor_video_resolution") is None
-    assert hass.states.get("sensor.test_processor_hdr") is None
+    entity_ids = {state.entity_id for state in hass.states.async_all()}
+    assert not [e for e in entity_ids if e.endswith(("_video_resolution", "_hdr", "_colour_space"))]
     # Everything else still exists.
-    assert hass.states.get("media_player.test_processor") is not None
-    assert hass.states.get("sensor.test_processor_surround_mode") is not None
+    assert [e for e in entity_ids if e.startswith("media_player.")]
+    assert [e for e in entity_ids if e.endswith("_surround_mode")]
 
 
 async def test_every_platform_declares_parallel_updates():
@@ -139,10 +142,16 @@ async def test_the_media_player_reports_the_units_own_values(hass, config_entry,
 
 
 async def test_the_volume_step_is_one_decibel(hass, config_entry, mock_client):
-    """The 0.1 default would be a five-decibel jump on this range, which is a lot in a room."""
+    """The 0.1 default would be a five-decibel jump on this range, which is a lot in a room.
+
+    Read off the entity rather than the state: `volume_step` drives `volume_up`/`volume_down`
+    and is not surfaced as a state attribute.
+    """
     await _setup(hass, config_entry, mock_client)
-    state = hass.states.get("media_player.test_processor")
-    assert state.attributes["volume_step"] == pytest.approx(1 / 50)
+    entity = hass.data["entity_components"]["media_player"].get_entity(
+        "media_player.test_processor"
+    )
+    assert entity.volume_step == pytest.approx(1 / 50)
 
 
 async def test_duplicate_source_labels_are_disambiguated(hass, config_entry, mock_client):
