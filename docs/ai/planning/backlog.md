@@ -44,7 +44,7 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 | `M3-01` | H | Five entity platforms, description-table driven | Feature `entity-platforms`. |
 | `M4-01` | H | Live validation and cutover from `monoprice_htp1` | Feature `live-cutover`. Old integration's files stay on disk as rollback. |
 | `M5-01` | M | Author `.claude/skills/monolith-htp1/SKILL.md` | Shape it like the `somfy-sdn` skill: traps, and a "common mistake → consequence" table. No skill for HACS or HA custom-component development exists anywhere — verified across 74 registries. |
-| `M5-02` | M | Brand icons and a PR to `home-assistant/brands` | Required for HACS default-list inclusion. |
+| `M5-02` | M | PR the brand icons to `home-assistant/brands` | Required for HACS default-list inclusion. The assets themselves now exist in-repo (`M0-02`), which is enough for the HACS action but **not** for the default list — that check requires the brands repository. Replace the placeholder artwork with something better first if anyone wants to. |
 | `M5-03` | L | Submit to the HACS default list | Needs: passing HACS action with no ignores, passing hassfest, a release created *after* both pass, plus repo description and topics. |
 
 ---
@@ -54,3 +54,4 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 | ID | Item | Evidence |
 |----|------|----------|
 | `M0-01` | AI DevKit initialized, all 7 phases, 20 built-in skills | `npx ai-devkit@latest lint` → "All checks passed"; `skill list` → 20 skills incl. every `dev-*` phase skill |
+| `M0-02` | Brand icons generated so the HACS `brands` check passes from this repo | `scripts/make_brand_icons.py` → `brand/icon.png` 256×256 RGBA, `icon@2x.png` 512×512 RGBA. HACS run 31918079021 failed `brands` 8/9 before; awaiting the run on this commit to confirm 9/9. |
