@@ -18,7 +18,7 @@ in the planning doc.
 | T3 `models.py` | **done** | 47 tests; 103 total green. A failing test found a floating-point tie defect — see below |
 | T4 `mso.py` + `options.py` | **done** | 37 mirror tests + 20 option tests; 160 total green; ruff clean |
 | T5 client: transport | **done** | 23 tests; 183 total green; slowest test 0.04 s. Two API warts raised at review and fixed |
-| T6 client: read path | todo | |
+| T6 client: read path | **done** | 17 tests; 200 total green. Budget guard demonstrated against a deliberately broken implementation |
 | T7 client: write path | todo | |
 | T8 fake device | todo | |
 | T9 integration tests | todo | |
@@ -259,6 +259,45 @@ The resulting public surface is exactly what the layers above need:
 docstring, which contains the words `random.seed()` as a warning. Exactly the false positive
 the AST approach was introduced for in T2, made again with a substring check. Now by AST, with
 `test_the_call_detector_actually_detects` proving the detector can fail.
+
+### T6 — `client.py`, read path
+
+**The parse-failure budget has three reset sites and one forbidden one.**
+
+| Where | Resets? | Why |
+|---|---|---|
+| A decodable message arrives | **yes** | The cap counts *consecutive* failures; one good reply means the unit is fine |
+| `_connect` | **yes** | A fresh connection is a fresh chance; old failures belong to a dead conversation |
+| `async_refresh` | **yes** | A deliberate re-request, from the reconcile watchdog or a manual reload |
+| The error path's own re-read | **NO** | Resetting here zeroes the counter on every failure and restores the storm the cap exists to prevent |
+
+The last row is enforced by calling `_request_document()` directly rather than `async_refresh()`,
+with a comment at the call site saying why. Measured against a deliberately broken build:
+
+```
+reset only on deliberate re-request : 2 re-reads for 10 bad frames   (capped)
+reset inside the error path's retry : 10 re-reads for 10 bad frames  (storm)
+```
+
+Without *any* reset the cap has no way back at all — a client whose first document failed three
+times would sit on a live socket, mute, forever. Both extremes were real Control4 defects.
+
+**`error` frames and unknown shapes cost nothing.** An `error "bad-verb"` means the unit
+rejected something *we* said; there is nothing to re-read and the connection survives. An
+unrecognised shape decoded fine. Charging either against the budget would throttle a healthy
+connection, which matters given assumption A5 — newer firmware emits payloads we have never
+seen.
+
+**Listeners get their own unsubscribe.** `add_listener` returns the callable, so a Home
+Assistant entity passes it straight to `async_on_remove` and cannot leak a subscription. A
+listener that raises is logged and skipped: the `except Exception` there is deliberately broad,
+because an entity blowing up in its callback must not cost the connection for every other
+entity on the unit.
+
+**A fake-only bug, worth noting.** `test_reconnecting_restores_the_budget` failed first time,
+and the fault was in `tests/fakes.py`, not the client: closing a held-open socket left
+`receive()` waiting on a gate nobody would set again, so the test hung rather than exercising
+the reconnect. A fake that cannot disconnect makes every reconnect test vacuous.
 
 ### Patterns
 

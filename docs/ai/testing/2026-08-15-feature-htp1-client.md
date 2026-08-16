@@ -247,11 +247,35 @@ Driven by an injected fake transport and a controllable clock; no socket.
 - [ ] `test_reconcile_deadline_is_per_flush` — a later write gets its full 2 s, not the
       remainder of the first write's window (AC-08)
 - [ ] `test_a_confirming_push_cancels_the_reconcile`
-- [ ] `test_parse_failures_stop_at_three` (AC-09)
-- [ ] `test_the_error_path_retry_does_not_reset_the_budget` — **the subtle one**; resetting here
-      rebuilds the unthrottled `getmso` storm (AC-09)
-- [ ] `test_a_deliberate_refresh_restores_the_budget` — connect, reconcile, manual refresh
-      (AC-09)
+**T6 read path — complete.** 17 tests.
+
+*Listeners*
+- [x] `test_a_listener_hears_what_moved`
+- [x] `test_a_push_that_changes_nothing_notifies_nobody`
+- [x] `test_unsubscribing_stops_the_notifications` — and the mirror still follows the push
+- [x] `test_unsubscribing_twice_is_harmless`
+- [x] `test_a_listener_that_raises_does_not_take_down_the_connection` — an entity having a bad
+      day must not cost the connection for everything else on the unit
+- [x] `test_a_document_push_notifies_too`
+
+*Not parse failures*
+- [x] `test_an_error_frame_does_not_spend_budget` — `error "bad-verb"`; no re-read, connection
+      survives
+- [x] `test_an_unknown_shape_does_not_spend_budget` — bare JSON and unknown verbs are free
+- [x] `test_a_bare_json_push_is_applied`
+
+*The budget* (AC-09)
+- [x] `test_an_undecodable_frame_triggers_one_re_read`
+- [x] `test_the_error_path_retry_does_not_reset_the_budget` — **the subtle one**. Demonstrated
+      against a deliberately broken implementation: the correct one issues 2 re-reads for 10
+      undecodable frames, the broken one issues 10
+- [x] `test_the_cap_is_logged_exactly_once` — past the cap the client goes quiet, rather than
+      one log line per frame
+- [x] `test_a_decodable_message_clears_the_streak` — the cap counts *consecutive* failures
+- [x] `test_a_deliberate_refresh_restores_the_budget`
+- [x] `test_reconnecting_restores_the_budget`
+- [x] `test_the_budget_is_three`
+- [x] `test_refreshing_while_disconnected_raises`
 - [ ] `test_the_queue_does_not_survive_a_disconnect` (AC-10)
 **T5 transport — complete.** 22 tests. Names as shipped:
 

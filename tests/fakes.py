@@ -55,7 +55,9 @@ class FakeWebSocket:
 
     async def receive(self) -> FakeMessage:
         while not self._incoming:
-            if not self.hold_open:
+            # A closed socket reports the disconnect even when it was holding open, or a test
+            # that closes one would simply hang instead of exercising the reconnect.
+            if self.closed or not self.hold_open:
                 return CLOSED
             self._gate.clear()
             await self._gate.wait()

@@ -42,6 +42,13 @@ DEFAULT_HEARTBEAT = 30.0
 DEFAULT_BACKOFF: tuple[float, ...] = (2.0, 4.0, 8.0, 16.0, 30.0, 60.0)
 DEFAULT_JITTER_RATIO = 0.2
 
+# A parse failure means the unit sent bytes this client could not decode as its own protocol;
+# the ~38 KB document is the realistic case. Below this many consecutive failures the fastest
+# recovery is simply asking again. At it, something is wrong enough that re-reading at line rate
+# would turn one bad reply into an unthrottled request storm against a unit in daily use, plus a
+# log line per iteration. A reconnect or a deliberate refresh is the way out.
+MAX_PARSE_FAILURES = 3
+
 WS_PORT = 80
 WS_PATH = "/ws/controller"
 
@@ -102,6 +109,8 @@ class Htp1Client:
         self._task: asyncio.Task[None] | None = None
         self._running = False
         self._backoff_index = 0
+        self._parse_failures = 0
+        self._listeners: list[Callable[[frozenset[str]], None]] = []
 
     # -- properties ----------------------------------------------------------------------
 
@@ -162,6 +171,71 @@ class Htp1Client:
                 await task
         await self._teardown()
 
+    # -- listeners -----------------------------------------------------------------------
+
+    def add_listener(self, callback: Callable[[frozenset[str]], None]) -> Callable[[], None]:
+        """Subscribe to change sets. Returns its own unsubscribe callable.
+
+        Handing back the unsubscribe means a Home Assistant entity can pass it straight to
+        `self.async_on_remove(...)` and cannot leak a subscription.
+        """
+        self._listeners.append(callback)
+
+        def unsubscribe() -> None:
+            with contextlib.suppress(ValueError):
+                self._listeners.remove(callback)
+
+        return unsubscribe
+
+    def _notify(self, changed: frozenset[str]) -> None:
+        """Tell listeners what moved, and only if something did.
+
+        A callback that raises is logged and skipped. An entity having a bad day must not cost
+        the connection for everything else on this unit.
+        """
+        if not changed:
+            return
+        for callback in list(self._listeners):
+            try:
+                callback(changed)
+            except Exception:
+                # Deliberately broad: a listener must never break the read loop.
+                _LOGGER.exception("listener for %s raised", self._host)
+
+    # -- reading -------------------------------------------------------------------------
+
+    async def async_refresh(self) -> None:
+        """Deliberately re-request the document, and restore the parse-failure budget.
+
+        This reset lives here, in a connect, and in the reconcile watchdog — the three places
+        that represent a fresh chance. It must **never** live in the error path's own retry:
+        resetting there would zero the counter on every failure and restore the unthrottled
+        request storm the cap exists to prevent, while looking perfectly reasonable.
+
+        Without any reset the cap has no way back at all: if the first document after a connect
+        failed to parse three times, the client would sit on a live socket, mute, forever.
+        """
+        if not self.connected:
+            raise Htp1ConnectionError(f"not connected to {self._host}")
+        self._parse_failures = 0
+        await self._request_document()
+
+    async def _handle_parse_failure(self, detail: str | None) -> None:
+        self._parse_failures += 1
+        if self._parse_failures < MAX_PARSE_FAILURES:
+            _LOGGER.error("undecodable message from %s: %s", self._host, detail)
+            # Deliberately `_request_document`, not `async_refresh`: the latter resets the
+            # budget, which would make this branch unthrottled again.
+            await self._request_document()
+        elif self._parse_failures == MAX_PARSE_FAILURES:
+            _LOGGER.error(
+                "undecodable message from %s: %s. giving up until the next reconnect or "
+                "refresh, rather than re-reading at line rate",
+                self._host,
+                detail,
+            )
+        # Past the cap, dropped on the floor. Silence is the point.
+
     # -- backoff -------------------------------------------------------------------------
 
     def _backoff_schedule(self, count: int) -> list[float]:
@@ -218,6 +292,9 @@ class Htp1Client:
             raise Htp1ConnectionError(f"cannot reach {self._host}: {err}") from err
 
         self._backoff_index = 0
+        # A fresh connection is a fresh chance: the old failures belong to a conversation that
+        # no longer exists.
+        self._parse_failures = 0
         await self._request_document()
 
     async def _request_document(self) -> None:
@@ -251,15 +328,30 @@ class Htp1Client:
         return protocol.parse_message(raw.data)
 
     async def _read_loop(self) -> None:
-        """Consume pushes until the link goes away. Extended with the parse budget in T6."""
+        """Consume pushes until the link goes away."""
         while self._running:
             message = await self._receive()
             if message is None:
                 return
+
+            if message.kind is protocol.MessageKind.MALFORMED:
+                await self._handle_parse_failure(message.detail)
+                continue
+
+            # A decodable message breaks the streak. The cap counts *consecutive* failures:
+            # one good reply means the unit is fine and the allowance should be whole again.
+            self._parse_failures = 0
+
             if message.kind is protocol.MessageKind.DOCUMENT:
-                self._mirror.apply_document(message.document)
+                self._notify(self._mirror.apply_document(message.document))
             elif message.kind is protocol.MessageKind.UPDATE:
-                self._mirror.apply_ops(message.ops)
+                self._notify(self._mirror.apply_ops(message.ops))
+            elif message.kind is protocol.MessageKind.ERROR:
+                # The unit rejected something we said. The connection survives, and there is
+                # nothing to re-read: this is not a decoding problem.
+                _LOGGER.error("%s rejected a message: %s", self._host, message.detail)
+            else:
+                _LOGGER.debug("ignoring an unrecognised message from %s", self._host)
 
     async def _supervise(self) -> None:
         """Keep the connection up for the life of the entry."""

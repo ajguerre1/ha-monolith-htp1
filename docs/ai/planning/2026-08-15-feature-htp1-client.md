@@ -29,7 +29,9 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 | T2 `protocol.py` | **done** | 34 tests. Split `MALFORMED` from `UNKNOWN`, which the plan had not called out |
 | T3 `models.py` | **done** | A failing test found a floating-point tie defect review had missed |
 | T4 `mso.py` + `options.py` | **done** | `options.py` was not a planned module; the design put these functions in `models.py`, but they consume the mirror's collections |
-| T5–T7 client | next | |
+| T5 client: transport | **done** | Two API warts raised at review and fixed before T6 |
+| T6 client: read path | **done** | Budget guard demonstrated against a broken build, not assumed |
+| T7 client: write path | next | The densest task; split the reconcile watchdog out if it grows |
 | T8–T10 tools | not started | |
 | T11 probe live | **blocked — needs approval**, by design | |
 | T12 reconcile | not started | |
