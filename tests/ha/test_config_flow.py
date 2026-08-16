@@ -35,9 +35,7 @@ class _Identity:
 
 async def _submit(hass, host, identity=None, error=None, flow_id=None):
     if flow_id is None:
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_USER}
-        )
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
         flow_id = result["flow_id"]
     with patch(
         PATCH_IDENTITY,

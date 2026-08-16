@@ -179,9 +179,7 @@ async def test_turning_off_uses_the_configured_action(hass, config_entry, mock_c
 
 async def test_do_nothing_really_does_nothing(hass, config_entry, mock_client):
     """A stray automation must not be able to silence a room that opted out."""
-    hass.config_entries.async_update_entry(
-        config_entry, options={"power_off_action": "do_nothing"}
-    )
+    hass.config_entries.async_update_entry(config_entry, options={"power_off_action": "do_nothing"})
     await _setup(hass, config_entry, mock_client)
     mock_client.async_write.reset_mock()
 

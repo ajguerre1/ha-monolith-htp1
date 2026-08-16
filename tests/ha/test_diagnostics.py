@@ -42,9 +42,7 @@ async def test_diagnostics_leak_no_site_data(
     assert not leaked, f"diagnostics leaked site data: {leaked}"
 
 
-async def test_diagnostics_still_say_something_useful(
-    hass, hass_client, config_entry, mock_client
-):
+async def test_diagnostics_still_say_something_useful(hass, hass_client, config_entry, mock_client):
     """Redaction that removed everything would be safe and worthless."""
     await _loaded(hass, config_entry, mock_client)
     dump = await get_diagnostics_for_config_entry(hass, hass_client, config_entry)
