@@ -35,9 +35,17 @@ from custom_components.ha_monolith_htp1.htp1.client import (
     Htp1TimeoutError,
 )
 
+# These are the only tests in the suite that open a real socket, and that needs saying out loud.
+# `pytest-homeassistant-custom-component` pulls in `pytest-socket`, which blocks socket use by
+# default — a good default, since it stops a unit test quietly reaching the network. It also
+# means these thirteen tests fail on CI while passing locally, where that plugin is absent.
+# Requesting `socket_enabled` re-permits it for this module only, so the block stays in force
+# everywhere else.
+pytestmark = pytest.mark.enable_socket
+
 
 @pytest.fixture
-async def session():
+async def session(socket_enabled):
     async with aiohttp.ClientSession() as client_session:
         yield client_session
 
