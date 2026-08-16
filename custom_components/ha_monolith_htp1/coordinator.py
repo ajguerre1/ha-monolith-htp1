@@ -142,10 +142,11 @@ class Htp1Coordinator(DataUpdateCoordinator[MsoMirror]):
         await self._write("/volume", fraction_to_db(fraction, low, high))
 
     async def async_set_power(self, on: bool) -> None:
-        """Turn on by setting power; turn off by the configured action.
+        """Turn on by setting power; turn off by the configured action, which defaults to sleep.
 
-        Off is `/powerAction`, not `/powerIsOn: false` — the unit distinguishes standby from
-        sleep, and the installer may want neither.
+        Off is `/powerAction`, not `/powerIsOn: false`, because the unit distinguishes sleep
+        from shutdown and only sleep keeps the network alive. Shutdown is reachable only from
+        its own opt-in button, never from a `turn_off` service call.
         """
         if on:
             await self._write("/powerIsOn", True)

@@ -23,7 +23,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import Htp1ConfigEntry
-from .const import POWER_OFF_KEEPS_NETWORK
+from .const import SLEEP_KEEPS_NETWORK
 from .coordinator import Htp1Coordinator
 from .entity import Htp1Entity
 from .htp1 import db_to_fraction, sound_mode_options, source_options
@@ -63,13 +63,13 @@ class Htp1MediaPlayer(Htp1Entity, MediaPlayerEntity):
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
-        """`TURN_ON` is only offered if the unit can hear us while it is off.
+        """`TURN_ON` is offered because "turn off" means *sleep*, which keeps the network up.
 
-        Whether its network stack survives `powerIsOn: false` is HW-01, still unmeasured. We
-        ship assuming it does, because being wrong that way means the write simply never lands
-        — the safe direction. The constant is referenced only here, so flipping it is one line.
+        Shutdown is the other thing entirely: it takes the network with it, so nothing could
+        wake the unit afterwards. That is why shutdown is a separate opt-in button and not
+        something `turn_off` can reach.
         """
-        if POWER_OFF_KEEPS_NETWORK:
+        if SLEEP_KEEPS_NETWORK:
             return _BASE_FEATURES | MediaPlayerEntityFeature.TURN_ON
         return _BASE_FEATURES
 
@@ -163,6 +163,7 @@ class Htp1MediaPlayer(Htp1Entity, MediaPlayerEntity):
         await self.coordinator.async_set_power(True)
 
     async def async_turn_off(self) -> None:
+        """Sleep by default, so the unit stays reachable and can be turned on again."""
         await self.coordinator.async_set_power(False)
 
     async def async_set_volume_level(self, volume: float) -> None:

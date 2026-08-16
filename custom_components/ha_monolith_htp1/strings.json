@@ -45,7 +45,7 @@
           "max_volume_db": "Volume limit (dB)"
         },
         "data_description": {
-          "power_off_action": "What \"turn off\" should do. Choose Do nothing if this processor should never be powered down by Home Assistant, for example when a stray automation could silence a room.",
+          "power_off_action": "What \"turn off\" should do.\n\nSleep turns off the front panel and waits for a fast wake-up. The processor stays on the network, so Home Assistant can still see it and can turn it back on. This is the right choice for almost everyone.\n\nShut down powers the processor down completely. It leaves the network with it, so Home Assistant loses the device entirely and cannot turn it back on — somebody has to press the button on the unit itself.\n\nDo nothing means Home Assistant will never power this processor down, which is worth choosing if a stray automation could silence a room in use.",
           "max_volume_db": "Refuse to set the volume above this level. Leave empty to allow the processor's own maximum. This limits what Home Assistant sends; it does not change what the processor reports."
         }
       }
@@ -54,8 +54,8 @@
   "selector": {
     "power_off_action": {
       "options": {
-        "off": "Standby",
-        "sleep": "Sleep",
+        "sleep": "Sleep (stays reachable)",
+        "off": "Shut down (Home Assistant loses the unit)",
         "do_nothing": "Do nothing"
       }
     }
@@ -131,6 +131,11 @@
       },
       "video_color_space": {
         "name": "Colour space"
+      }
+    },
+    "button": {
+      "shutdown": {
+        "name": "Shut down"
       }
     }
   }

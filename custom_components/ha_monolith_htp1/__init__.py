@@ -25,6 +25,7 @@ from .coordinator import Htp1Coordinator
 from .htp1.client import Htp1Client, Htp1Error
 
 PLATFORMS: list[Platform] = [
+    Platform.BUTTON,
     Platform.MEDIA_PLAYER,
     Platform.NUMBER,
     Platform.SELECT,

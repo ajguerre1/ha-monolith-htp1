@@ -19,22 +19,34 @@ MODEL: Final = "Monolith HTP-1"
 CONF_POWER_OFF_ACTION: Final = "power_off_action"
 CONF_MAX_VOLUME_DB: Final = "max_volume_db"
 
-# What "turn off" should do. `do_nothing` exists because a room turning off, or a stray
-# automation, should not be able to take a whole processor down.
-POWER_OFF_STANDBY: Final = "off"
-POWER_OFF_SLEEP: Final = "sleep"
-POWER_OFF_NOTHING: Final = "do_nothing"
-POWER_OFF_ACTIONS: Final = (POWER_OFF_STANDBY, POWER_OFF_SLEEP, POWER_OFF_NOTHING)
-DEFAULT_POWER_OFF_ACTION: Final = POWER_OFF_STANDBY
-
-# HW-01, still open: we do not know whether the unit keeps its network stack alive while
-# `powerIsOn` is false. Both firmware families report `fastStart: "on"`, which strongly suggests
-# yes, so we ship assuming yes and declare TURN_ON. Being wrong in that direction means the
-# write simply never lands, because we are disconnected — which is the safe way to be wrong.
+# The unit has TWO ways of going quiet, and they are not interchangeable. Its own web UI
+# presents them as separate buttons with separate warnings:
 #
-# Settling it needs a write to the designated lab unit and is deferred to M4. This constant is
-# referenced in exactly one place, so flipping it is a one-line change.
-POWER_OFF_KEEPS_NETWORK: Final = True
+#   /powerAction: "sleep"  — "Turn off front panel and sleep awaiting fast wake up".
+#                            The network stays up, so Home Assistant can still see it and can
+#                            wake it again. This is what a media player's "turn off" means.
+#   /powerAction: "off"    — "Orderly shutdown the system and enter low power state".
+#                            **The network goes with it.** Measured 2026-08-16 on the lab unit:
+#                            no answer on port 80 within ten seconds, still nothing after four
+#                            minutes, and the unit had to be started from its front panel.
+#
+# Mapping "turn off" to shutdown would mean Home Assistant loses the device every time someone
+# turned a room off, and could never turn it back on.
+POWER_OFF_SLEEP: Final = "sleep"
+POWER_OFF_SHUTDOWN: Final = "off"
+POWER_OFF_NOTHING: Final = "do_nothing"
+POWER_OFF_ACTIONS: Final = (POWER_OFF_SLEEP, POWER_OFF_SHUTDOWN, POWER_OFF_NOTHING)
+DEFAULT_POWER_OFF_ACTION: Final = POWER_OFF_SLEEP
+
+# Sleep keeps the network, so `TURN_ON` is a real capability rather than a button that cannot
+# work. This is the vendor's documented behaviour and the owner's experience of these units; we
+# have measured the *shutdown* half directly but not yet the sleep half. HW-01b tracks that.
+SLEEP_KEEPS_NETWORK: Final = True
+
+# Shutdown ends communication until someone walks to the unit. Measured, not inferred. This is
+# why the shutdown control is a separate, deliberately opt-in button rather than anything a
+# `turn_off` service call can reach.
+SHUTDOWN_ENDS_COMMUNICATION: Final = True
 
 # How long setup waits for the first document before giving up and letting Home Assistant
 # retry. The client's own connect deadline is 15 s; this leaves room for it to fire first and

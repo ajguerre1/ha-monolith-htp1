@@ -25,9 +25,8 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 
 | ID | Pri | Item | Method | Why it blocks |
 |----|-----|------|--------|---------------|
-| `HW-01` | H | Does the unit keep its network stack alive when `powerIsOn` is false? | **Write** `/powerAction: "off"`, watch the socket 120 s | Decides whether `TURN_ON` is reachable at all, and therefore whether `MediaPlayerEntityFeature.TURN_ON` may be declared. Both units report `fastStart: "on"`, which suggests yes. Record as `POWER_OFF_KEEPS_NETWORK` in `const.py`, referenced in exactly one place. |
-| `HW-05` | M | Does `/status` keep reporting a stale format while the unit is powered off? | Read-only, after `HW-01` | If it does, a dashboard shows "Dolby Atmos" on a dark processor. Gate those sensors to `None` via `BLANK_STATUS_WHEN_OFF`. |
 | `HW-06` | M | Does lip sync require the dual write (`/cal/lipsync` **and** `/inputs/<current>/delay`)? | **Write** | The vendor's own client writes both. Writing only the first is believed to leave the unit's own display disagreeing. |
+| `HW-01b` | M | Does the unit stay reachable in **sleep**, and does `/status` go stale there? | **Write** `/powerAction: "sleep"` on the lab unit, watch the socket | This is the half that actually matters for `turn_off` and `TURN_ON`. The vendor documents sleep as keeping the network, and the owner confirms it, but we have measured only the shutdown half. If sleep also drops the network, `TURN_ON` is not a real capability and `SLEEP_KEEPS_NETWORK` must go false. |
 | `HW-08` | L | Does a front-panel change propagate as an unrequested push? | Read-only `observe`, with someone at a unit | Not settled by the T11 run: nobody was at a panel, so 45 s of idle observation proved the *absence* of chatter but not the presence of propagation. The Control4 project observed it, so this is confirmation rather than discovery. |
 
 ### Build
@@ -47,6 +46,8 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 
 | ID | Item | Evidence |
 |----|------|----------|
+| `HW-01` | **Shutdown ends communication; sleep does not.** The question was framed as one state and is really two | Measured 2026-08-16 on the lab unit: `/powerAction: "off"` — no answer on port 80 within 10 s, still silent after 4 minutes, needed the front-panel button. A control unit answered throughout, so the network path was fine. **The framing was the error**: `off` is the web UI's SHUTDOWN, while SLEEP is the standby that keeps networking. `turn_off` now maps to `sleep`, and shutdown is its own opt-in button. |
+| `HW-05` | Moot: `/status` cannot be read while the unit is shut down | It stops answering entirely, so there is nothing to read. For sleep the question would reappear, and `HW-01b` covers it. |
 | `HW-02` | `/eq/tc` measured: **`bool`** on all five units | `probe_htp1.py summary`, 2026-08-16, firmware V2.1.2 ×5. `two_state_paths` reports `/eq/tc: bool`, `/loudness: string`, `/bassenhance: string`, `/muted: bool`, `/powerIsOn: bool` — the declared codecs are correct. **Only 2.1.2 was measured**; no unit here runs 1.13.x, so that family stays inferred and the warn-once mismatch check stays. |
 | `HW-03` | **No MAC address anywhere in the document** | `probe_htp1.py` plus a loose scan for MAC-shaped values and `*mac*` keys: the only matches are `/inputs/*/macro`. `/network/eth0` carries `dhcp`, `addr`, `mask`, `gw` and nothing else, and `addr`/`mask`/`gw` are empty strings. **Consequence: DHCP self-heal is not buildable from the document.** The README must recommend a reservation and must not imply a self-heal; `"dhcp": [{"registered_devices": true}]` needs a MAC to register as a device connection. |
 | `HW-04` | Volume range measured: **`vpl = -50`, `vph = 0` on all five** | `probe_htp1.py summary` ×5, 2026-08-16. Matches the value the design assumed, now confirmed rather than assumed. Still read live — they remain user-configurable. |

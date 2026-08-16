@@ -40,6 +40,8 @@ EXPECTED_ENTITIES = {
 }
 
 DISABLED_BY_DEFAULT = {
+    # Shutdown ends communication with the unit, so enabling it is the confirmation gate.
+    "button.test_processor_shut_down",
     "sensor.test_processor_program_format",
     "sensor.test_processor_input_sample_rate",
     "sensor.test_processor_output_sample_rate",
@@ -115,6 +117,7 @@ async def test_every_platform_declares_parallel_updates():
     import importlib
 
     for platform in (
+        Platform.BUTTON,
         Platform.MEDIA_PLAYER,
         Platform.NUMBER,
         Platform.SELECT,
@@ -344,3 +347,56 @@ async def test_a_switch_writes_a_boolean_and_the_client_encodes_it(hass, config_
     )
 
     mock_client.async_write.assert_awaited_with("/loudness", True)
+
+
+# --------------------------------------------------------------------------------------
+# Shutdown, which is deliberately not a mode of turn_off
+# --------------------------------------------------------------------------------------
+
+
+async def test_shutdown_is_not_reachable_from_turn_off(hass, config_entry, mock_client):
+    """The whole point of separating them.
+
+    `turn_off` sleeps, which keeps the unit on the network. Shutdown is its own opt-in button.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    await hass.services.async_call(
+        "media_player",
+        "turn_off",
+        {"entity_id": "media_player.test_processor"},
+        blocking=True,
+    )
+
+    mock_client.async_write.assert_awaited_with("/powerAction", "sleep")
+
+
+async def test_the_shutdown_button_must_be_enabled_before_it_can_be_pressed(
+    hass, config_entry, mock_client
+):
+    """Enabling it is the only real confirmation gate Home Assistant offers a button."""
+    await _setup(hass, config_entry, mock_client)
+    registry = er.async_get(hass)
+
+    entry = registry.async_get("button.test_processor_shut_down")
+    assert entry is not None
+    assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert hass.states.get("button.test_processor_shut_down") is None
+
+
+async def test_pressing_shutdown_writes_the_shutdown_action(hass, config_entry, mock_client):
+    """Once deliberately enabled, it does exactly one thing."""
+    registry = er.async_get(hass)
+    await _setup(hass, config_entry, mock_client)
+    registry.async_update_entity("button.test_processor_shut_down", disabled_by=None)
+    await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.test_processor_shut_down"},
+        blocking=True,
+    )
+
+    mock_client.async_write.assert_awaited_with("/powerAction", "off")

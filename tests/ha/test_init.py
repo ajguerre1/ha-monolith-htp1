@@ -167,14 +167,28 @@ async def test_the_volume_ceiling_limits_what_is_sent(hass, config_entry, mock_c
     mock_client.async_write.assert_awaited_with("/volume", -20)
 
 
-async def test_turning_off_uses_the_configured_action(hass, config_entry, mock_client):
-    """Off is `/powerAction`; the unit distinguishes standby from sleep."""
-    hass.config_entries.async_update_entry(config_entry, options={"power_off_action": "sleep"})
+async def test_turning_off_sleeps_by_default(hass, config_entry, mock_client):
+    """Sleep, never shutdown.
+
+    Shutdown takes the network with it — measured on 2026-08-16, the unit was silent for four
+    minutes and needed its front panel. Mapping `turn_off` to that would mean Home Assistant
+    lost the device every time somebody turned a room off, with no way to turn it back on.
+    """
     await _setup(hass, config_entry, mock_client)
 
     await config_entry.runtime_data.coordinator.async_set_power(False)
 
     mock_client.async_write.assert_awaited_with("/powerAction", "sleep")
+
+
+async def test_turning_off_can_be_configured_to_shut_down(hass, config_entry, mock_client):
+    """Available, but only because someone chose it explicitly in the options."""
+    hass.config_entries.async_update_entry(config_entry, options={"power_off_action": "off"})
+    await _setup(hass, config_entry, mock_client)
+
+    await config_entry.runtime_data.coordinator.async_set_power(False)
+
+    mock_client.async_write.assert_awaited_with("/powerAction", "off")
 
 
 async def test_do_nothing_really_does_nothing(hass, config_entry, mock_client):
