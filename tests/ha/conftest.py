@@ -20,7 +20,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ha_monolith_htp1.const import DOMAIN
-from custom_components.ha_monolith_htp1.htp1.mso import MsoMirror
+from custom_components.ha_monolith_htp1.htp1.mso import TRACKED_PATHS, MsoMirror
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
@@ -44,6 +44,14 @@ def mirror(document) -> MsoMirror:
 
 
 @pytest.fixture
+def mso_legacy_mirror() -> MsoMirror:
+    """A firmware 1.13.x document: no video block at all."""
+    loaded = MsoMirror()
+    loaded.apply_document(json.loads((FIXTURES / "mso_legacy.json").read_text(encoding="utf-8")))
+    return loaded
+
+
+@pytest.fixture
 def mock_client(mirror) -> MagicMock:
     """A stand-in for `Htp1Client` with every method the integration calls.
 
@@ -56,7 +64,18 @@ def mock_client(mirror) -> MagicMock:
     client.reconnecting = True
     client.mirror = mirror
     client.pending_paths = ()
-    client.optimistic.side_effect = lambda path: mirror.get(path.strip("/"))
+
+    def optimistic(path: str):
+        """Wire path to mirrored value, the way the real client does it.
+
+        Not `mirror.get(path.strip("/"))`: the mirror is keyed by *field name*, so `/powerIsOn`
+        is `power` and `/upmix/select` is `upmix`. Stripping slashes returns None for every
+        path whose name differs from its last segment, which is most of them.
+        """
+        field = TRACKED_PATHS.get(path)
+        return mirror.get(field.name) if field else None
+
+    client.optimistic.side_effect = optimistic
 
     client.async_start = AsyncMock()
     client.async_stop = AsyncMock()
