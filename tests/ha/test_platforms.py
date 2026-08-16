@@ -385,18 +385,25 @@ async def test_the_shutdown_button_must_be_enabled_before_it_can_be_pressed(
 
 
 async def test_pressing_shutdown_writes_the_shutdown_action(hass, config_entry, mock_client):
-    """Once deliberately enabled, it does exactly one thing."""
-    registry = er.async_get(hass)
-    await _setup(hass, config_entry, mock_client)
-    registry.async_update_entity("button.test_processor_shut_down", disabled_by=None)
-    await hass.config_entries.async_reload(config_entry.entry_id)
-    await hass.async_block_till_done()
+    """Once deliberately enabled, it does exactly one thing.
 
-    await hass.services.async_call(
-        "button",
-        "press",
-        {"entity_id": "button.test_processor_shut_down"},
-        blocking=True,
-    )
+    The reload has to happen inside the patch: outside it, Home Assistant builds a real client
+    and tries to reach a host that does not exist, so the entry never loads and the service
+    call has nothing to reach.
+    """
+    with patch(PATCH_CLIENT, return_value=mock_client):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+        er.async_get(hass).async_update_entity("button.test_processor_shut_down", disabled_by=None)
+        await hass.config_entries.async_reload(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+        await hass.services.async_call(
+            "button",
+            "press",
+            {"entity_id": "button.test_processor_shut_down"},
+            blocking=True,
+        )
 
     mock_client.async_write.assert_awaited_with("/powerAction", "off")
