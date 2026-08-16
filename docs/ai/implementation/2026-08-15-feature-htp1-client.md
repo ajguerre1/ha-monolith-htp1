@@ -24,7 +24,7 @@ in the planning doc.
 | T8 fake device | **done** | `tools/fake_htp1.py`, 8 faults, usable as a CLI and importable by tests |
 | T9 integration tests | **done** | 13 tests over loopback; found a real gap in the client |
 | T10 probe script | **done** | 9 tests; 263 total green. Verified against the fake over a real socket |
-| T11 probe the five units (read-only, **gated on approval**) | todo | |
+| T11 probe the five units (read-only) | **done** | Run 2026-08-16 with approval. HW-02, HW-03, HW-04, HW-07 closed with measurements |
 | T12 reconcile | todo | |
 
 ## Development Setup
@@ -405,7 +405,7 @@ probe never passes `allow_writes=True`. It now asserts the script never names `a
 the write-method guard have a test proving they can fail.
 
 **`summary` deliberately bypasses `Htp1Client`.** The client keeps a *projection* — about thirty
-leaves of a 38 KB document — which is the point of it, and exactly the wrong thing for a tool
+leaves of a 47 KB document — which is the point of it, and exactly the wrong thing for a tool
 whose job is to report what the unit actually sent, including keys this integration has never
 heard of. It opens its own socket, sends `getmso`, and parses the reply. The first draft tried
 to recover the document from the client and had a stub that silently returned `{}`; the tests
@@ -421,6 +421,49 @@ must not be pasted anywhere.
 Verified end to end against the fake device: the digest answers all four measurable hardware
 questions and leaks none of the invented site data, and `observe` correctly reports zero pushes
 from an idle unit.
+
+### T11 — measuring the five units, read-only
+
+Run 2026-08-16 with explicit approval. Five `summary` reads and one 45-second `observe`. No
+writes; the probe cannot make one.
+
+**All five are on firmware V2.1.2 / avController 5.115.** Newer than the 1.13.3 and 2.1.1 the
+Control4 project verified, and identical across the fleet — so this integration currently has
+*no* unit on the 1.x branch. Everything the design says about 1.13.x remains inferred.
+
+| Question | Answer | Consequence |
+|---|---|---|
+| **HW-04** `vpl`/`vph` | **−50 / 0 on all five** | Matches the design's assumption, now measured. Still read live; they stay user-configurable |
+| **HW-02** `/eq/tc` type | **`bool`**, with `/loudness` and `/bassenhance` `string` | The declared codecs are correct on 2.1.2. Measured only there, so the warn-once mismatch check stays for 1.x |
+| **HW-03** MAC in document | **None.** Only `*mac*` matches are `/inputs/*/macro`; `/network/eth0` has `dhcp`/`addr`/`mask`/`gw` and the last three are empty strings | **DHCP self-heal is not buildable.** The README must recommend a reservation and must not imply otherwise |
+| **HW-07** `/status` vocabulary | `SurroundMode` ∈ {Native Dolby ATMOS, Dolby Surround}; `ENCListeningFormat` ∈ {3.1.2, 5.1.2, 5.2.2t, 7.2.2} | `5.2.2t` is exactly why these are free-text sensors rather than enumerations |
+
+**Two facts that change the code's assumptions:**
+
+1. **The document is ~47.4 KB, not ~38 KB.** Every comment quoting 38 KB has been corrected;
+   the number appears in the parse-budget rationale, so leaving it stale would misrepresent
+   what a re-read costs.
+2. **All 30 tracked paths are present on every unit** (`tracked_paths_absent: []`), and
+   `videostat` is present on all five. The absence-tolerance code is still right, but no unit
+   here currently exercises it.
+
+**Shape facts that will shape M2:**
+- 21 inputs, all labelled, but only **3 visible** per unit — the source list will be short.
+- **Zero named Dirac slots**, `diracactive: "off"`, `currentdiracslot: 0` on all five. The slot
+  selector will show `0 - Slot 0` … `5 - Slot 5`, which is exactly what the index-prefixed
+  labelling was designed for.
+- The document has ~45 top-level keys; this integration reads a handful. Untracked blocks
+  include `speakers`, `peq`, `sgen`, `personalize`, `CEC`, `bluetooth`, `network`, `stat`,
+  `modes`, `pipelineState`.
+
+**What the observe run did and did not prove.** 45 seconds of idle observation produced **zero
+pushes**, reproducing the Control4 project's 90-second measurement on newer firmware and
+confirming that polling would be pure waste. It did **not** confirm that a front-panel change
+propagates, because nobody was at a panel. That is now `HW-08`, and it is confirmation of prior
+work rather than a discovery.
+
+**Nothing measured reached the repository.** The per-unit map of address, unit name, serial and
+firmware went to gitignored `local/fleet-map.md`, written without echoing names to the terminal.
 
 ### Patterns
 

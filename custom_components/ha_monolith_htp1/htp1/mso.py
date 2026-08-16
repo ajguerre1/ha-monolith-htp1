@@ -1,4 +1,4 @@
-"""The MSO mirror: the ~38 KB device document projected down to what this integration uses.
+"""The MSO mirror: the ~47 KB device document projected down to what this integration uses.
 
 This is the only module a firmware revision forces anyone to edit, which is why it is separate
 from `models.py` — a firmware diff should never scroll past the volume arithmetic.

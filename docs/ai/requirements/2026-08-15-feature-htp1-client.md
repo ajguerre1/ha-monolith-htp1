@@ -119,7 +119,7 @@ has a passing test**, not when the code looks right.
 | AC-21 | The probe script never constructs a write-enabled client and never calls a write method | `test_the_probe_is_read_only_by_construction` |
 
 **Performance:** applying a `msoupdate` for an untracked path (e.g. `/status/raw/...`) must not
-walk the document — a dict lookup and at most two anchored regex matches. The ~38 KB `mso`
+walk the document — a dict lookup and at most two anchored regex matches. The ~47 KB `mso`
 document collapses to ~35 tracked leaves plus three collections.
 
 **Coverage target:** every module in `htp1/` exercised; the `mso` applier and the dB math are

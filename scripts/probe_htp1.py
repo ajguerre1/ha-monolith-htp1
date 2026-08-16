@@ -157,7 +157,7 @@ async def _read_document(host: str, port: int, timeout: float) -> dict[str, Any]
     """One `getmso`, straight off the wire. Read-only, and nothing is ever sent but that verb.
 
     This deliberately does not go through `Htp1Client`. The client keeps a *projection* of the
-    document — about thirty leaves out of a 38 KB object — which is the whole point of it, and
+    document — about thirty leaves out of a 47 KB object — which is the whole point of it, and
     exactly the wrong thing for a tool whose job is to report what the unit actually sent,
     including keys this integration has never heard of.
     """

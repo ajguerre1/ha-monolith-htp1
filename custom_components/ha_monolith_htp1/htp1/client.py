@@ -53,7 +53,7 @@ DEFAULT_FLUSH_DELAY = 0.05
 DEFAULT_RECONCILE_DELAY = 2.0
 
 # A parse failure means the unit sent bytes this client could not decode as its own protocol;
-# the ~38 KB document is the realistic case. Below this many consecutive failures the fastest
+# the ~47 KB document is the realistic case. Below this many consecutive failures the fastest
 # recovery is simply asking again. At it, something is wrong enough that re-reading at line rate
 # would turn one bad reply into an unthrottled request storm against a unit in daily use, plus a
 # log line per iteration. A reconnect or a deliberate refresh is the way out.

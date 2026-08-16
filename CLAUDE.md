@@ -38,7 +38,8 @@ through HACS. Domain `ha_monolith_htp1`, package `custom_components/ha_monolith_
 ## The device, in one paragraph
 
 `ws://<host>/ws/controller`, port 80, no auth, no TLS, no REST API, no mDNS/SSDP. Text frames
-of `verb[space]JSON`, **split on the first space only**. `getmso` → `mso {…}` (~38 KB).
+of `verb[space]JSON`, **split on the first space only**. `getmso` → `mso {…}` (~47 KB on firmware 2.1.2; the Control4 project measured ~38 KB on
+2.1.1).
 `changemso [ops]` writes RFC 6902 `replace` operations. The unit pushes `msoupdate [ops]` on
 every change from any source including the front panel — sometimes as a single unwrapped op,
 and on newer firmware sometimes as bare JSON with no verb. Junk input returns

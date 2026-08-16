@@ -1,4 +1,4 @@
-"""The MSO mirror: a ~38 KB document projected down to the ~30 leaves this integration uses.
+"""The MSO mirror: a ~47 KB document projected down to the ~30 leaves this integration uses.
 
 Three behaviours here are subtle enough that getting them wrong produces no error, just wrong
 state, and all three are pinned below.

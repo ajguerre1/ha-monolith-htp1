@@ -54,7 +54,7 @@ graph TD
 
 ## Data Models
 
-**`MsoMirror` is a projection, not a copy.** The ~38 KB document collapses to ~35 tracked scalar
+**`MsoMirror` is a projection, not a copy.** The ~47 KB document collapses to ~35 tracked scalar
 leaves plus three collections. Untracked subtrees — notably `/status/raw`, a large nested blob
 of decoder internals — are dropped at classification time and never allocated.
 
@@ -80,7 +80,8 @@ collections:
 warning **once** if an observed value contradicts its declared codec, so a wrong guess surfaces
 as a log line rather than a silently dead switch.
 
-**Value domains** (verified on firmware 1.13.3 and 2.1.1)
+**Value domains** (verified on firmware 1.13.3 and 2.1.1; `vpl`/`vph` and `/eq/tc` re-measured
+on 2.1.2 across five units, 2026-08-16)
 
 | Path | Domain |
 |---|---|
@@ -101,7 +102,7 @@ only.
 | Direction | Message | Notes |
 |---|---|---|
 | → | `getmso` | no argument |
-| ← | `mso {…}` | full document, ~38 KB. A **census**: members it omits are gone |
+| ← | `mso {…}` | full document, **~47 KB measured on firmware 2.1.2**. A **census**: members it omits are gone |
 | → | `changemso [ops]` | RFC 6902 array, never empty, `replace` only |
 | ← | `msoupdate [ops]` | array **or a single unwrapped op**. **Partial**: absent ≠ cleared |
 | ← | `error "bad-verb"` | connection survives; log, do not disconnect |
