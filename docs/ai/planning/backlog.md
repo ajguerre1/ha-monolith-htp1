@@ -54,4 +54,5 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 | ID | Item | Evidence |
 |----|------|----------|
 | `M0-01` | AI DevKit initialized, all 7 phases, 20 built-in skills | `npx ai-devkit@latest lint` → "All checks passed"; `skill list` → 20 skills incl. every `dev-*` phase skill |
-| `M0-02` | Brand icons generated so the HACS `brands` check passes from this repo | `scripts/make_brand_icons.py` → `brand/icon.png` 256×256 RGBA, `icon@2x.png` 512×512 RGBA. HACS run 31918079021 failed `brands` 8/9 before; awaiting the run on this commit to confirm 9/9. |
+| `M0-02` | Brand icons generated so the HACS `brands` check passes from this repo | `scripts/make_brand_icons.py` → `brand/icon.png` 256×256 RGBA, `icon@2x.png` 512×512 RGBA. CI run 31918079021 failed `brands` (8/9); run **31918223147** on commit `7acaf56` → "All (9) checks passed". |
+| `M0-03` | Repository published and CI green end to end | `ajguerre1/ha-monolith-htp1`, public, description + 8 topics. CI run **31918223147**: hassfest ✓, HACS ✓, ruff ✓, pytest ✓ (6 tests), strings parity ✓. |
