@@ -13,7 +13,7 @@ description: Define testing approach, test cases, and quality assurance
 - Every acceptance criterion AC-01..AC-19 in the requirements doc maps to a named test below.
   An AC with no passing test is an open AC.
 - Test names are full sentences describing the behaviour, and each module docstring states the
-  defect the suite guards against. Most of these defects are real ones from the Control4
+  defect the suite guards against. Most of these defects are real ones from the earlier driver
   driver, and the docstring is what stops someone "simplifying" the guard away later.
 - No Home Assistant import anywhere in `tests/` — it must run on the Windows dev box.
 
@@ -97,7 +97,7 @@ sharper. 34 tests.
       integer dB across `(-50, 0)`, `(-80, 10)`, `(-127, 0)` (AC-03). The `(-127, 0)` case is
       the one that matters: 128 dB values cannot survive a 101-step percentage
 - [x] `test_the_fraction_is_never_quantised` — the regression guard for Q4; fails the moment
-      someone restores the Control4 `dbToPercent` behaviour
+      someone restores the earlier driver's `dbToPercent` behaviour
 - [x] `test_the_fraction_is_a_float_between_zero_and_one`
 - [x] `test_the_endpoints_map_to_zero_and_one`
 - [x] `test_ties_round_down_never_up` (AC-04) — ties identified with `Fraction`, not floats,
@@ -283,7 +283,7 @@ Driven by an injected fake transport and a controllable clock; no socket.
 - [x] `test_the_url_is_the_controller_endpoint_on_port_eighty`
 - [x] `test_the_heartbeat_is_configured_on_the_socket`
 - [x] `test_a_refused_connection_raises_rather_than_retrying`
-- [x] `test_a_socket_that_never_upgrades_times_out` (AC-01) — the Control4 Critical defect,
+- [x] `test_a_socket_that_never_upgrades_times_out` (AC-01) — the earlier driver's Critical defect,
       reproduced against a connection that accepts and never upgrades
 - [x] `test_the_shipped_connect_timeout_is_fifteen_seconds` — tests use 0.02 s; the default
       must stay the measured one
@@ -391,7 +391,7 @@ Against `tools/fake_htp1.py`, over a real loopback socket with a real `aiohttp.C
 - [x] `test_junk_input_is_rejected_and_the_connection_survives`
 - [x] `test_the_handshake_timeout_fires_against_a_socket_that_never_upgrades` — **the single
       most valuable fault in the set** (AC-01). The only end-to-end proof, and the defect it
-      models wedged the Control4 driver permanently
+      models wedged an earlier driver permanently
 - [x] `test_the_wrong_path_is_refused` — closed with 1008 on anything but `/ws/controller`
 - [x] `test_a_document_that_never_decodes_exhausts_the_budget_and_goes_quiet`
 - [x] `test_bare_json_payloads_are_understood`
@@ -403,7 +403,7 @@ Against `tools/fake_htp1.py`, over a real loopback socket with a real `aiohttp.C
 
 > **Two scenarios dropped, with reasons.** `test_a_trickled_document_reassembles` and
 > `test_an_ignored_ping_is_detected_and_reconnects` tested RFC 6455 fragment reassembly and the
-> pong deadline. The Control4 driver needed both because it hand-wrote its own codec; here
+> pong deadline. The earlier driver needed both because it hand-wrote its own codec; here
 > aiohttp owns framing and derives the pong deadline from `heartbeat`, so these would test
 > aiohttp rather than anything in this repository. `close-after-document` reaches the same
 > recovery path, and `test_a_dropped_connection_is_re_established` covers it.
@@ -429,7 +429,7 @@ survive `powerIsOn: false`) and HW-06 (lip-sync dual write).
 
 ## Test Data
 
-**Fixtures** ported from the Control4 driver's `tests/fixtures.lua`, where they are already
+**Fixtures** ported from the earlier driver's Lua fixtures, where they are already
 invented rather than captured. `tests/fixtures/`:
 
 | File | Shape |
@@ -506,7 +506,7 @@ asserted instead:
 
 ## Bug Tracking
 
-`docs/ai/planning/backlog.md`: stable IDs, never reused, `open · in-progress · blocked · parked
+`docs/planning/backlog.md`: stable IDs, never reused, `open · in-progress · blocked · parked
 · done`, priority H/M/L. **An item closes only with evidence** — a test name, a CI run number,
 or a live observation. Severity is judged by what reaches the house: anything that can send an
 unintended write to a live processor is the top band, ahead of any correctness bug that is

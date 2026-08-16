@@ -19,7 +19,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REQUIREMENTS = REPO_ROOT / "docs" / "ai" / "requirements" / "2026-08-15-feature-htp1-client.md"
+REQUIREMENTS = REPO_ROOT / "docs" / "requirements" / "2026-08-15-feature-htp1-client.md"
 TESTS_DIR = Path(__file__).parent
 
 # | AC-01 | criterion text | `test_one`, `test_two` |

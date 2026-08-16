@@ -1,9 +1,9 @@
 """Constants for the HA Monolith HTP1 integration.
 
 Every non-obvious value carries a comment naming the measurement or the defect that produced it.
-Protocol facts were verified live on firmware 1.13.3 and 2.1.1 during the Control4 Monolith
-HTP-1 project, and re-measured on 2.1.2 across five units on 2026-08-16; see
-`docs/ai/planning/backlog.md` for the evidence.
+Protocol facts were verified live on firmware 1.13.3 and 2.1.1 during an earlier driver
+project for this processor, and re-measured on 2.1.2 across five units on 2026-08-16; see
+`docs/planning/backlog.md` for the evidence.
 """
 
 from __future__ import annotations

@@ -7,7 +7,7 @@ over loopback.
 
 `test_the_handshake_timeout_fires_against_a_socket_that_never_upgrades` is the reason this file
 exists. It is the only end-to-end proof of AC-01, and the defect it models — a unit that binds
-port 80 while it is still booting, before `/ws/controller` is live — wedged the Control4 driver
+port 80 while it is still booting, before `/ws/controller` is live — wedged the earlier driver
 for this same processor until someone reloaded it by hand. An in-process fake can imitate that;
 only a real socket demonstrates it.
 

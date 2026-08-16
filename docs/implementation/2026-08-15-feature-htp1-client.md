@@ -67,7 +67,7 @@ file imports nothing; from M2 it imports Home Assistant, and without the stub ev
 would fail at import time on this machine. `test_harness.py` asserts the stub has no
 `__file__`, which is what proves the real module never executed.
 
-**Fixtures were written from scratch, not ported.** The Control4 driver's `tests/fixtures.lua`
+**Fixtures were written from scratch, not ported.** The earlier driver's `tests/fixtures.lua`
 also holds invented values, but regenerating closes risk R5 by construction instead of by
 inspection. Only the *schema* was reused — path names and value domains, which are documented
 and are not site data.
@@ -222,7 +222,7 @@ connect-timeout test uses a 0.02 s deadline while `DEFAULT_CONNECT_TIMEOUT` stay
 own test. The whole transport suite runs in 0.08 s.
 
 **The connect timeout spans the handshake, not just the TCP connect.** `_HangingConnection` in
-`tests/fakes.py` reproduces the exact Control4 defect: a connection that is accepted and never
+`tests/fakes.py` reproduces the exact defect that caused it: a connection that is accepted and never
 upgraded. Without the deadline nothing internal can leave the connecting state.
 
 **`async_start` makes one attempt.** On failure it tears down and raises, having started no
@@ -281,7 +281,7 @@ reset inside the error path's retry : 10 re-reads for 10 bad frames  (storm)
 ```
 
 Without *any* reset the cap has no way back at all — a client whose first document failed three
-times would sit on a live socket, mute, forever. Both extremes were real Control4 defects.
+times would sit on a live socket, mute, forever. Both extremes were real an earlier driver defects.
 
 **`error` frames and unknown shapes cost nothing.** An `error "bad-verb"` means the unit
 rejected something *we* said; there is nothing to re-read and the connection survives. An
@@ -376,7 +376,7 @@ with no seam, so the client could not be pointed at a loopback server at all. No
 parameter defaulting to 80. The device is always on 80, but a transport that cannot be tested
 over loopback is worse than one with a parameter nobody changes.
 
-**Two faults from the Control4 set are deliberately absent.** `trickle` and `drop-mid-frame`
+**Two faults from the earlier driver's set are deliberately absent.** `trickle` and `drop-mid-frame`
 tested RFC 6455 fragment reassembly, which that driver needed because it hand-wrote its codec.
 Here aiohttp owns framing, so those would be testing aiohttp. Same for suppressing a pong: the
 deadline is aiohttp's. Recorded in the tool's own docstring so the omission reads as a decision
@@ -428,7 +428,7 @@ Run 2026-08-16 with explicit approval. Five `summary` reads and one 45-second `o
 writes; the probe cannot make one.
 
 **All five are on firmware V2.1.2 / avController 5.115.** Newer than the 1.13.3 and 2.1.1 the
-Control4 project verified, and identical across the fleet — so this integration currently has
+an earlier driver project verified, and identical across the fleet — so this integration currently has
 *no* unit on the 1.x branch. Everything the design says about 1.13.x remains inferred.
 
 | Question | Answer | Consequence |
@@ -457,7 +457,7 @@ Control4 project verified, and identical across the fleet — so this integratio
   `modes`, `pipelineState`.
 
 **What the observe run did and did not prove.** 45 seconds of idle observation produced **zero
-pushes**, reproducing the Control4 project's 90-second measurement on newer firmware and
+pushes**, reproducing an earlier 90-second measurement on newer firmware and
 confirming that polling would be pure waste. It did **not** confirm that a front-panel change
 propagates, because nobody was at a panel. That is now `HW-08`, and it is confirmation of prior
 work rather than a discovery.

@@ -224,7 +224,7 @@ authority; nothing in this layer can change that, and the README says so plainly
 | `tools/fake-htp1.py` | A local server speaking the real protocol from an invented document, with fault injection | — | Not shipped. Faults: `accept-tcp-no-upgrade`, `trickle`, `ignore-ping`, `bare-json`, `never-confirm`, `container-replace`, `garbage`, `no-videostat`, `no-serial`, `drop-mid-frame` |
 
 `accept-tcp-no-upgrade` deserves its own note: it is the **only** way to prove AC-01, and the
-defect it models — a unit binding port 80 before `/ws/controller` is live — wedged the Control4
+defect it models — a unit binding port 80 before `/ws/controller` is live — wedged an earlier driver
 driver permanently. A fault injector that cannot produce it would leave the single most
 dangerous failure path untested.
 
@@ -253,9 +253,9 @@ dangerous failure path untested.
 | **Read-only by default** (`allow_writes=False`) | Five live processors in an occupied home. A probe script is then read-only *by construction*, not by discipline | Trusting the prose rule; a host allowlist wrapper that must be remembered |
 | **`mso.py` split from `models.py`** | Largest unit and the only one a firmware change forces you to edit; a firmware diff should never touch the dB math | One module: a "did the tie rule regress" review would scroll past a patch applier |
 | **Round half DOWN**, `ceil(x - 0.5)`, **applied only in `fraction_to_db`** | Over −50..0, 48 of the 101 round percentages a UI sends land on an exact half-dB, so the tie rule decides roughly half of all inputs. Volume must land quieter than asked. Holds for either sign, unlike round-half-away-from-zero | Python's `round()` — banker's rounding, wrong at every tie in a *different* way |
-| **`db_to_fraction` returns an unrounded float** | Home Assistant's `volume_level` is a float 0..1, not an integer percentage. Forcing it through 101 integer steps loses information once a unit's range exceeds 101 dB values: over −127..0, **27 of 128 dB values fail to round-trip**, and the first failure returns one dB *louder* than requested. Measured during the Phase 2 review | Porting the Control4 driver's `dbToPercent` verbatim — correct there because a Control4 room endpoint takes an integer percent, silently lossy here |
+| **`db_to_fraction` returns an unrounded float** | Home Assistant's `volume_level` is a float 0..1, not an integer percentage. Forcing it through 101 integer steps loses information once a unit's range exceeds 101 dB values: over −127..0, **27 of 128 dB values fail to round-trip**, and the first failure returns one dB *louder* than requested. Measured during the Phase 2 review | Porting the earlier driver's `dbToPercent` verbatim — correct there because that platform's room endpoint takes an integer percent, silently lossy here |
 | **Optimistic echo + 2 s reconcile** | The UI must respond to a slider immediately, but the unit's value is the truth. Timer re-arms per flush so a later write gets its full grace period | Waiting for confirmation before updating: a visibly laggy slider |
-| **Parse budget resets only on deliberate re-request** | Resetting in the error path's own retry rebuilds the unthrottled `getmso` storm the cap exists to prevent. Without *any* reset the client can never recover | Either extreme; both were real Control4 defects |
+| **Parse budget resets only on deliberate re-request** | Resetting in the error path's own retry rebuilds the unthrottled `getmso` storm the cap exists to prevent. Without *any* reset the client can never recover | Either extreme; both were real an earlier driver defects |
 | **Per-client `random.Random(seed)`** | A library calling `random.seed()` mutates global state for all of Home Assistant | `random.seed()` — and unseeded RNG already caused lockstep reconnects |
 | **Injected `ClientSession`** | Lets the integration pass HA's managed session while keeping `client.py` free of HA imports | Creating a session internally: an unmanaged connector per config entry |
 | **`heartbeat=30.0`** | `aiohttp` derives the pong deadline as `N/2` with no second knob — **verified in 3.14.3, `client_ws.py:93`: `self._pong_heartbeat = heartbeat / 2.0`**. So 30 s gives a 15 s pong deadline and 45 s worst-case half-open detection, inside the 60 s backoff cap | `autoping=False` + a hand-rolled ping loop, which then obliges us to answer the unit's own PINGs — reimplementing what aiohttp gets right |
@@ -295,14 +295,14 @@ mirror returns only fields that actually moved.
 
 ## Requirements Coverage
 
-Checked against `docs/ai/requirements/2026-08-15-feature-htp1-client.md` during the Phase 3
+Checked against `docs/requirements/2026-08-15-feature-htp1-client.md` during the Phase 3
 review. Everything below is now covered; the four rows marked **added in review** were genuine
 holes, not restatements.
 
 | Requirement | Covered by |
 |---|---|
 | Goal 1 — offline-testable, no HA imports | Module table; injected session; injected transport and clock |
-| Goal 2 — port the Control4 invariants | Design Decisions table; Reliability table |
+| Goal 2 — port the earlier driver's invariants | Design Decisions table; Reliability table |
 | Goal 3 — safe by construction | Read-only default; Write contract **(added in review)** |
 | Goal 4 — probe script, two modes | `scripts/probe_htp1.py` component **(added in review)** |
 | Goal 5 — fake device with fault injection | `tools/fake-htp1.py` component **(added in review)** |

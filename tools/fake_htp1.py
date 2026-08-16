@@ -10,13 +10,13 @@ socket without a processor present. Run it standalone, or drive it from tests:
 
 **The fault that matters most is `accept-tcp-no-upgrade`.** It is the only way to prove the 15 s
 handshake timeout fires, and the defect it models — a unit binding port 80 while it is still
-booting, before `/ws/controller` is live — wedged the Control4 driver for this same processor
+booting, before `/ws/controller` is live — wedged an earlier driver for this same processor
 permanently, until someone reloaded it by hand.
 
 The document here is invented. A real `mso` carries the owner's unit name, input labels, Dirac
 slot names and serial number, and this repository is public.
 
-Two faults from the Control4 project are deliberately absent. `trickle` (one byte per write) and
+Two faults from the earlier driver are deliberately absent. `trickle` (one byte per write) and
 `drop-mid-frame` tested RFC 6455 fragment reassembly, which that driver needed because it
 hand-wrote its own codec. Here aiohttp owns framing, so those faults would be testing aiohttp
 rather than anything in this repository. The same applies to suppressing a pong: the pong

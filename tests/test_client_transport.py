@@ -2,7 +2,7 @@
 
 The single most important test here is the handshake timeout. The HTP-1 binds port 80 while it
 is still booting, before `/ws/controller` is live, so a client can complete a TCP connection and
-then wait forever for an upgrade that is never coming. In the Control4 driver for this same
+then wait forever for an upgrade that is never coming. In the earlier driver for this same
 device that was a Critical defect: nothing internal could leave the connecting state, so a unit
 rebooting wedged the driver until someone reloaded it by hand.
 
@@ -103,7 +103,7 @@ async def test_a_refused_connection_raises_rather_than_retrying():
 
 
 async def test_a_socket_that_never_upgrades_times_out():
-    """The Critical defect from the Control4 driver, reproduced.
+    """The Critical defect from the earlier driver, reproduced.
 
     Port 80 accepts while the unit boots; `/ws/controller` is not live yet. Without this
     timeout nothing can move the client out of the connecting state.
@@ -257,7 +257,7 @@ async def test_jitter_actually_varies_the_delay():
 
 
 async def test_two_clients_do_not_reconnect_in_lockstep():
-    """Unseeded RNG made two Control4 driver instances reconnect together after every blip."""
+    """Unseeded RNG made two instances of an earlier driver reconnect together after every blip."""
     one = Htp1Client(FakeSession(), "10.0.0.1", seed="unit-one")._backoff_schedule(10)
     two = Htp1Client(FakeSession(), "10.0.0.2", seed="unit-two")._backoff_schedule(10)
     assert one != two

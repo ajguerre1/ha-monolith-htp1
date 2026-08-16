@@ -5,8 +5,8 @@ mirrors state; this one decides what number reaches a processor in an occupied r
 the one place where being wrong is audible rather than merely visible.
 
 The volume map carries a defect that was caught in review rather than in production, and these
-tests exist to keep it caught. The Control4 driver for this same device converts dB to an
-*integer percentage*, because a Control4 room endpoint takes one. Home Assistant's
+tests exist to keep it caught. The earlier driver for this same device converts dB to an
+*integer percentage*, because that platform's room endpoint takes one. Home Assistant's
 `volume_level` is a float. Porting the quantisation looks obviously right and is silently
 lossy: over a -127..0 range, 27 of 128 dB values fail to round-trip, and the first failure
 returns one dB LOUDER than requested — the exact direction the tie rule exists to prevent.
@@ -90,7 +90,7 @@ def test_the_fraction_is_never_quantised():
     """The regression guard for the ported-quantisation defect.
 
     Over -127..0, -125 dB is 1.5748...% — a value no 101-step percentage can represent. If this
-    starts landing on a whole percent, the Control4 behaviour has been reintroduced.
+    starts landing on a whole percent, the earlier driver's behaviour has been reintroduced.
     """
     fraction = models.db_to_fraction(-125, -127, 0)
     percent = fraction * 100

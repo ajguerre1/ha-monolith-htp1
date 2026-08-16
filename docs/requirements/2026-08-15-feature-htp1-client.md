@@ -24,7 +24,7 @@ The integration needs to talk to an HTP-1, and nothing usable exists to do it wi
 - The obvious reference implementation, `ross/ha-monoprice-htp1`, documents that it "will
   sometimes lose the ability to talk to the device after a month or two" — so copying its
   transport would import a known defect.
-- We already own a correct implementation of this protocol in Lua, from the Control4 Monolith
+- We already own a correct implementation of this protocol in Lua, from the earlier Monolith
   HTP-1 driver, whose adversarial reviews caught six classes of bug. That knowledge is the
   asset; rewriting it from scratch in Python would discard it.
 
@@ -39,7 +39,7 @@ Home Assistant instance that drives ~50 wall panels.
 
 1. A correct, fully offline-testable client that owns the socket, the protocol, and the
    mirrored device state — and imports no Home Assistant.
-2. Port every hard-won invariant from the Control4 driver rather than rediscovering it.
+2. Port every hard-won invariant from an earlier driver rather than rediscovering it.
 3. Be safe against a live, occupied house **by construction**, not by discipline.
 
 **Secondary goals**
@@ -138,7 +138,7 @@ the two where a silent wrong answer is most likely, so both get exhaustive table
 - Python 3.13+ / ruff `target-version = "py313"`. Local dev runs 3.14.5; CI runs 3.13.
 - `tests/` must import no Home Assistant so it runs on Windows.
 - `aiohttp`'s `ws_connect(heartbeat=N)` derives its pong deadline as `N/2` and exposes no
-  second knob, so the Control4 driver's 30 s ping / 10 s pong pair is **not expressible**. We
+  second knob, so the earlier driver's 30 s ping / 10 s pong pair is **not expressible**. We
   use `heartbeat=30.0` → 15 s pong deadline, 45 s worst-case half-open detection. Documented,
   not hidden.
 
@@ -195,7 +195,7 @@ edited, because the reasoning is the part worth keeping.
 
 **Q4 — AC-03 was false as originally written, and the cause was a bad port.**
 
-The Control4 driver converts dB to an **integer percentage**, because that is what a Control4
+The earlier driver converts dB to an **integer percentage**, because that is what that platform's
 room volume endpoint takes. Porting that verbatim looked obviously right. It is not: Home
 Assistant's `volume_level` is a **float 0..1**, and forcing it through 101 integer steps loses
 information whenever the unit's range has more than 101 dB values.
@@ -224,7 +224,7 @@ value are different behaviours: during a ramp the confirmed value lags by up to 
 comparing against it would let a stream of writes through and defeat the guard.
 
 **Resolved:** compare against the **optimistic** value — the mirror with pending writes applied.
-That is what the Control4 driver does, and its comment explains the consequence: a same-value
+That is what the earlier driver does, and its comment explains the consequence: a same-value
 command arriving while a prior write is unconfirmed is swallowed, and self-heals via the 2 s
 reconcile.
 

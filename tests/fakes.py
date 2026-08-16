@@ -109,7 +109,7 @@ class FakeSession:
 class _HangingConnection:
     """Accepts the TCP connection and never completes the upgrade.
 
-    This is the failure that wedged the Control4 driver permanently: a unit binds port 80 while
+    This is the failure that wedged an earlier driver permanently: a unit binds port 80 while
     booting, before `/ws/controller` is live. Without a connect timeout nothing can move the
     client out of this state.
     """

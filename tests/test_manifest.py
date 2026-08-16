@@ -41,8 +41,9 @@ def test_domain_matches_the_package_directory() -> None:
 def test_iot_class_is_local_push() -> None:
     """The unit pushes msoupdate on every change and an idle socket sent zero bytes over 90 s.
 
-    Polling this device is pure waste, and `local_polling` would advertise a lie. The sibling
-    ha_somfy integration is local_polling for good reasons of its own -- do not copy it here.
+    Polling this device is pure waste, and `local_polling` would advertise a lie. Do not copy
+    this value from another integration; most local devices genuinely are polling, and this one
+    is the exception rather than the rule.
     """
     assert _manifest()["iot_class"] == "local_push"
 

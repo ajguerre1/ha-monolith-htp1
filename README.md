@@ -154,12 +154,10 @@ runs in CI.
 `scripts/probe_htp1.py` is a **read-only** probe for real hardware; it cannot write, and a test
 enforces that.
 
-This project follows the [AI DevKit](https://github.com/codeaholicguy/ai-devkit) lifecycle;
-phase documentation lives under `docs/ai/`. To restore the tooling in a fresh clone:
-
-```bash
-npx ai-devkit@latest init -a -e claude --built-in --yes
-```
+Requirements, design and planning documents live under `docs/`. The design document is worth
+reading before changing the client: most of what looks arbitrary in there — the tie rule on
+volume rounding, the parse-failure budget, the write queue's debounce — is a defect that was
+paid for once already.
 
 ## Credits
 

@@ -1,12 +1,10 @@
----
-name: monolith-htp1
-description: Use when talking to a Monoprice Monolith HTP-1 AV processor over its WebSocket control interface (ws://<host>/ws/controller, port 80, no auth) — reading the MSO document, writing changemso operations, mapping volume to a percentage, or diagnosing a unit that went silent after a power command, a volume that lands a decibel too loud, a Dirac dropdown that picks the wrong slot, or an integration that floods Home Assistant with state writes.
----
+# Monoprice Monolith HTP-1 — device notes
 
-# Monoprice Monolith HTP-1 over its WebSocket controller
+What this processor actually does, as opposed to what its document suggests it does.
 
 Measured against five live units on firmware 2.1.2, plus a prior driver verified on 1.13.3 and
-2.1.1. Every number here was observed, not inferred.
+2.1.1. Every number here was observed, not inferred. If you are writing anything that talks to
+an HTP-1 — this integration or your own — the traps below each cost something to find.
 
 **Core principle: the unit's confirmed value is the truth.** It echoes every change from every
 source — front panel, web UI, another controller — so there is never a reason to display what
@@ -29,7 +27,7 @@ spaces.
 Unsolicited: `msoupdate [ops]` on every change from any source. Sometimes a **single unwrapped
 op** instead of an array, and on newer firmware sometimes **bare JSON with no verb at all**.
 
-An idle connection sent **zero bytes over 90 seconds**. This is `local_push`; any poll interval
+An idle connection sent **zero bytes over 90 seconds**. This is a push device; any poll interval
 is pure waste. Concurrent controller connections are served independently, so reading never
 fights the web UI or another controller.
 
@@ -153,12 +151,12 @@ The document is not uniform, and 1.13.x is not 2.1.x.
 - **To prove no state write happened, assert on `last_reported`, not `last_updated`.** An
   identical-value write leaves `last_updated` alone — which is exactly the case you are testing.
 
-## Tools in this repo
+## Working on real hardware
 
-`scripts/probe_htp1.py` — read-only, scrubbed digest, cannot write, and a test enforces that.
-`tools/fake_htp1.py` — the real protocol with fault injection; `accept-tcp-no-upgrade` is the
-only way to prove the handshake timeout fires.
+`scripts/probe_htp1.py` is read-only, produces a scrubbed digest, cannot write, and a test
+enforces that. `tools/fake_htp1.py` speaks the real protocol with fault injection;
+`accept-tcp-no-upgrade` is the only way to prove the handshake timeout fires.
 
-**Any script that writes to real hardware must restore in a `finally` and must not be able to
-die of its own logging.** One here raised `UnicodeEncodeError` from a `print` between the write
-and the restore, and left a unit holding a changed value.
+**Any script that writes to a real unit must restore in a `finally`, and must not be able to die
+of its own logging.** One here raised `UnicodeEncodeError` from a `print` between the write and
+the restore, and left a unit holding a changed value.

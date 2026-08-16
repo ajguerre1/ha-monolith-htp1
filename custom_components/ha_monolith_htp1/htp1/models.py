@@ -6,8 +6,8 @@ The unit takes an **integer dB** clamped to `[cal.vpl, cal.vph]`, and both bound
 user-configurable — never assume -50..0. Home Assistant takes a **float 0..1**. The conversion
 between them is only interesting because of two decisions:
 
-1. **The fraction is never quantised.** The Control4 driver for this same processor converts dB
-   to an integer percentage, because a Control4 room endpoint takes one. Reusing that here is
+1. **The fraction is never quantised.** The earlier driver for this same processor converts dB
+   to an integer percentage, because that platform's room endpoint takes one. Reusing that here is
    silently lossy: a range with more than 101 dB values cannot survive the round trip. Over
    -127..0 that is 27 of 128 values, and the first failure returns one dB *louder* than
    requested.

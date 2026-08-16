@@ -48,7 +48,7 @@ read-only probe that cannot write.
 - `options.py` became its own module. The design put those functions in `models.py`, but they
   consume the mirror's collections.
 - T7 was split into T7a and T7b, as this plan advised rather than as a surprise.
-- Two Control4 faults (`trickle`, `drop-mid-frame`) were dropped from the fake with reasons
+- Two an earlier driver faults (`trickle`, `drop-mid-frame`) were dropped from the fake with reasons
   recorded: aiohttp owns framing here, so they would test aiohttp.
 - The probe's read-only guard is stricter than specified — the word `allow_writes` may not
   appear in the script at all.
@@ -82,7 +82,7 @@ hardware in an occupied home, so it does not happen on my own initiative.
 - *Depends on:* nothing.
 - *Evidence:* fixtures load in a smoke test; suite still green on Windows.
 - *Scenarios:* all of them — every later task reads these fixtures.
-- *Note:* **Written from scratch, not ported.** The Control4 driver's `tests/fixtures.lua` has
+- *Note:* **Written from scratch, not ported.** The earlier driver's `tests/fixtures.lua` has
   invented values too, but regenerating removes the question entirely rather than answering it
   by inspection — R5 is closed by construction. Only the *schema* is reused: path names and
   value domains, which are documented in the design doc and are not site data. Every string is
@@ -164,7 +164,7 @@ hardware in an occupied home, so it does not happen on my own initiative.
 - *Outcome:* 10 tests from the testing doc's integration group.
 - *Depends on:* T7, T8.
 - *Evidence:* `test_the_handshake_timeout_fires_against_accept_tcp_no_upgrade` — the only proof
-  of AC-01 against a real socket, and the defect that wedged the Control4 driver.
+  of AC-01 against a real socket, and the defect that wedged the earlier driver.
 
 **T10 — `scripts/probe_htp1.py`**
 - *Outcome:* `summary` mode (connect, `getmso`, scrubbed digest, disconnect) and `observe` mode
@@ -241,7 +241,7 @@ proven against a real socket).
 | R2 | Bare-JSON payloads (A5) are inherited from another project and unobserved by us | Tolerate the shape regardless — it costs nothing. T11's observe run records whether it is real; the comment stays honest either way |
 | R3 | ~~`aiohttp` heartbeat/pong semantics assumed~~ | **Closed.** Verified in aiohttp 3.14.3: `client_ws.py:93`, `self._pong_heartbeat = heartbeat / 2.0`. `heartbeat=30.0` → 15 s pong deadline as designed |
 | R4 | Dev box runs Python 3.14.5, CI runs 3.13 | ruff `target-version = "py313"`; CI is the authority. Avoid 3.14-only syntax |
-| R5 | Fixtures ported from a real device's document shape could carry site data | Re-verify each fixture before commit; the Control4 originals are already invented, but check rather than trust |
+| R5 | Fixtures ported from a real device's document shape could carry site data | Re-verify each fixture before commit; the originals are already invented, but check rather than trust |
 | R6 | T7 is dense enough to invite a rushed review | Split the reconcile watchdog out rather than compressing it |
 | R7 | Timing tests that use real sleeps become flaky and slow | Inject the clock. No test in this milestone may call `asyncio.sleep` to wait for a timer |
 | R8 | Probing live hardware during T11 | Read-only by construction (AC-21), plus an explicit go-ahead before the run. HW-01/HW-06 need writes and are deferred to M4 on the lab unit |
@@ -249,7 +249,7 @@ proven against a real socket).
 ## Resources Needed
 
 - **Tools:** Python 3.13+, `ruff`, `pytest`, `pytest-asyncio`, `websockets` (dev-only), `gh`.
-- **Knowledge:** the Control4 driver's `state.lua`, `session.lua`, `mapping.lua` and its design
+- **Knowledge:** the earlier driver's `state.lua`, `session.lua`, `mapping.lua` and its design
   doc — port these rather than re-deriving. `jsoosiah/htp1-custom-controller` for MSO paths.
 - **Infrastructure:** none. No device is required until T11, and no Home Assistant instance is
   required in this milestone at all.

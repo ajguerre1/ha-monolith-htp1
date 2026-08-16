@@ -2,7 +2,7 @@
 
 Everything above it sees `connected`, a mirror, and (from T6) a change callback.
 
-Two behaviours in this file exist because of specific defects in the Control4 driver for this
+Two behaviours in this file exist because of specific defects in the earlier driver for this
 same processor, and neither is optional:
 
 **The connect timeout covers the handshake, not just the TCP connect.** The unit binds port 80
