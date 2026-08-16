@@ -20,20 +20,14 @@ import types
 from pathlib import Path
 
 import pytest
+from support import DOMAIN, REPO_ROOT, home_assistant_available
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DOMAIN = "ha_monolith_htp1"
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-try:  # pragma: no cover - the branch taken depends on the machine, not the code
-    import homeassistant  # noqa: F401
-
-    HA_AVAILABLE = True
-except ImportError:
-    HA_AVAILABLE = False
+HA_AVAILABLE = home_assistant_available()
 
 if not HA_AVAILABLE:
     for name, path in (

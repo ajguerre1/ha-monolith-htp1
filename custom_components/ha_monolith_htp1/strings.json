@@ -1,0 +1,63 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a Monolith HTP-1",
+        "description": "Enter the processor's address. It has no username or password — the control interface is unauthenticated, so anyone who can reach it on the network can control it.\n\nThere is no discovery: the HTP-1 advertises no mDNS or SSDP service, and its status document carries no MAC address, so Home Assistant cannot follow it if DHCP moves it. Give each unit a reservation or a static address.",
+        "data": {
+          "host": "Address"
+        },
+        "data_description": {
+          "host": "Hostname or IP address, for example 192.168.1.50. A pasted http:// URL is accepted too."
+        }
+      },
+      "reconfigure": {
+        "title": "Change the address",
+        "description": "This processor is currently at {host}. Enter its new address.\n\nThe unit is identified by its serial number, so pointing this entry at a different processor is refused rather than silently re-targeting every entity.",
+        "data": {
+          "host": "Address"
+        },
+        "data_description": {
+          "host": "Hostname or IP address."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach that address. Check that the processor is powered on and on the network, and that the address is right.",
+      "timeout_connect": "The address answered but did not complete the connection. The processor accepts network connections while it is still starting up, so wait about thirty seconds and try again.",
+      "not_htp1": "Something answered at that address, but it did not respond like a Monolith HTP-1. Check that the address belongs to the processor.",
+      "invalid_host": "That does not look like an address.",
+      "unknown": "Something unexpected went wrong. Check the Home Assistant log for details."
+    },
+    "abort": {
+      "already_configured": "That processor is already set up.",
+      "reconfigure_successful": "The address was updated.",
+      "wrong_device": "That address belongs to a different processor. To add it, use Add integration instead."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "description": "These change how the integration behaves. What appears as entities is controlled in the entity settings, not here.",
+        "data": {
+          "power_off_action": "When turned off",
+          "max_volume_db": "Volume limit (dB)"
+        },
+        "data_description": {
+          "power_off_action": "What \"turn off\" should do. Choose Do nothing if this processor should never be powered down by Home Assistant, for example when a stray automation could silence a room.",
+          "max_volume_db": "Refuse to set the volume above this level. Leave empty to allow the processor's own maximum. This limits what Home Assistant sends; it does not change what the processor reports."
+        }
+      }
+    }
+  },
+  "selector": {
+    "power_off_action": {
+      "options": {
+        "off": "Standby",
+        "sleep": "Sleep",
+        "do_nothing": "Do nothing"
+      }
+    }
+  }
+}
