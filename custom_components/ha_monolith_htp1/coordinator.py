@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -160,9 +161,39 @@ class Htp1Coordinator(DataUpdateCoordinator[MsoMirror]):
             return
         await self._write("/powerAction", action)
 
+    async def async_set_lip_sync(self, milliseconds: int) -> None:
+        """Write lip sync to both places the unit keeps it.
+
+        `/cal/lipsync` is the setting; `/inputs/<current>/delay` is where the unit stores it per
+        input. **It does not propagate one to the other.** Measured 2026-08-16 on the lab unit:
+        writing `/cal/lipsync` alone moved it from 0 to 120 while every input's delay stayed at
+        0. So a single write leaves the unit's own display disagreeing with Home Assistant, and
+        the value is lost the moment the input is switched away and back.
+
+        Both writes go in one call so the client coalesces them into a single `changemso`, which
+        is also what the vendor's own client does.
+
+        If the unit has not said which input is current there is nothing to pair with, so this
+        writes the setting alone rather than guessing at an input.
+        """
+        current = self.optimistic("/input")
+        if current is None:
+            _LOGGER.debug("%s has not reported an input; writing lip sync alone", self.client.host)
+            await self._write("/cal/lipsync", milliseconds)
+            return
+        await self._write_many(
+            {"/cal/lipsync": milliseconds, f"/inputs/{current}/delay": milliseconds}
+        )
+
     async def async_write(self, path: str, value: Any) -> None:
         """Write one path. Entities go through here rather than touching the client."""
         await self._write(path, value)
+
+    async def _write_many(self, pairs: Mapping[str, Any]) -> None:
+        try:
+            await self.client.async_write_many(pairs)
+        except Htp1Error as err:
+            raise HomeAssistantError(str(err)) from err
 
     async def _write(self, path: str, value: Any) -> None:
         try:

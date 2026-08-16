@@ -421,14 +421,60 @@ async def test_a_number_writes_an_integer(hass, config_entry, mock_client):
     await hass.services.async_call(
         "number",
         "set_value",
-        {"entity_id": "number.test_processor_lip_sync", "value": 120},
+        {"entity_id": "number.test_processor_dialogue_enhancement", "value": 4.0},
         blocking=True,
     )
 
     path, value = mock_client.async_write.await_args.args
-    assert path == "/cal/lipsync"
-    assert value == 120
+    assert path == "/dialogEnh"
+    assert value == 4
     assert isinstance(value, int)
+
+
+async def test_lip_sync_writes_both_paths_at_once(hass, config_entry, mock_client):
+    """HW-06, measured 2026-08-16: the unit does not keep the two in step by itself.
+
+    Writing `/cal/lipsync` alone moved it from 0 to 120 on the lab unit while all twenty-one
+    inputs stayed at 0 — so the unit's own display would disagree with Home Assistant, and the
+    value would be lost as soon as the input was switched away and back.
+
+    One call rather than two, so the client coalesces them into a single `changemso`.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": "number.test_processor_lip_sync", "value": 120},
+        blocking=True,
+    )
+
+    current = mock_client.mirror.get("input")
+    mock_client.async_write_many.assert_awaited_once_with(
+        {"/cal/lipsync": 120, f"/inputs/{current}/delay": 120}
+    )
+    mock_client.async_write.assert_not_awaited()
+
+
+async def test_lip_sync_without_a_known_input_writes_the_setting_alone(
+    hass, config_entry, mock_client
+):
+    """Absence tolerance: pair with the current input, or write the one path we do know.
+
+    Guessing at an input would write a delay onto whichever one happened to sort first.
+    """
+    await _setup(hass, config_entry, mock_client)
+    mock_client.optimistic.side_effect = lambda path: None if path == "/input" else 0
+
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": "number.test_processor_lip_sync", "value": 40},
+        blocking=True,
+    )
+
+    mock_client.async_write.assert_awaited_once_with("/cal/lipsync", 40)
+    mock_client.async_write_many.assert_not_awaited()
 
 
 async def test_a_switch_writes_a_boolean_and_the_client_encodes_it(hass, config_entry, mock_client):

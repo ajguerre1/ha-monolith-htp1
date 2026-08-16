@@ -1,13 +1,12 @@
 """Numeric controls: dialogue enhancement and lip sync.
 
-Lip sync carries an unresolved question. The vendor's own client writes `/cal/lipsync` **and**
-`/inputs/<current input>/delay` together, and writing only the first is believed to leave the
-unit's own display disagreeing with the value it is using. That is HW-06, still unmeasured
-because settling it needs a write to the lab unit.
+Lip sync is written to two paths, not one. The unit keeps the setting at `/cal/lipsync` and the
+per-input value at `/inputs/<current input>/delay`, and **it does not keep them in step**:
+measured 2026-08-16 on the lab unit, writing `/cal/lipsync` alone moved it from 0 to 120 while
+every one of the twenty-one inputs stayed at 0. That is HW-06, and it settles the question the
+vendor's own client answered by writing both.
 
-Until it is settled this writes only `/cal/lipsync`, which is the conservative choice: one
-documented path, no guess about a second. The constant below is the single place to change if
-the measurement says otherwise.
+The pairing itself lives in the coordinator, like every other command semantic.
 """
 
 from __future__ import annotations
@@ -32,9 +31,9 @@ from .htp1.mso import TRACKED_PATHS
 
 PARALLEL_UPDATES = 0
 
-# HW-06. See the module docstring: flip this only once a write test on the lab unit says the
-# dual write is required.
-LIP_SYNC_ALSO_WRITES_INPUT_DELAY = False
+# The one path that needs the paired write. Named rather than repeated so the check below and
+# the description above cannot drift apart.
+LIP_SYNC_PATH = "/cal/lipsync"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -106,4 +105,8 @@ class Htp1Number(Htp1Entity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         # Every path here takes an integer; sending 40.0 where the unit expects 40 is asking
         # for a firmware to be fussy about it.
+        if self.entity_description.path == LIP_SYNC_PATH:
+            # Lip sync lives in two places and the unit does not keep them in step itself.
+            await self.coordinator.async_set_lip_sync(int(value))
+            return
         await self.coordinator.async_write(self.entity_description.path, int(value))

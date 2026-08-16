@@ -81,6 +81,9 @@ def mock_client(mirror) -> MagicMock:
     client.async_stop = AsyncMock()
     client.async_refresh = AsyncMock()
     client.async_write = AsyncMock()
+    # Explicit rather than left to MagicMock's auto-attribute: an auto-created child is not
+    # awaitable, so a coordinator that started using it would fail for the wrong reason.
+    client.async_write_many = AsyncMock()
 
     listeners: list = []
     client.listeners = listeners
