@@ -19,6 +19,30 @@ description: Define testing approach, test cases, and quality assurance
 
 ## Unit Tests
 
+### Fixtures and harness (T1) — **complete**
+
+Added during implementation; not foreseen when this document was first written. The fixtures
+are ground truth for every later test, so they are tested themselves.
+
+- [x] `test_all_three_documents_load`
+- [x] `test_modern_and_legacy_differ_in_firmware_shape` — `videostat` present vs absent,
+      `secondaryVolume` vs `secondVolume`, `V2.x` vs `V1.x`
+- [x] `test_both_documents_carry_exactly_six_dirac_slots`
+- [x] `test_the_two_unnamed_slot_shapes_are_both_represented` — `name: ""` in modern, `name`
+      key absent in legacy. Different code paths; covering only one lets the other regress
+- [x] `test_modern_carries_a_status_raw_blob_that_must_be_ignored`
+- [x] `test_modern_carries_duplicate_input_labels` — the source list has to disambiguate
+- [x] `test_modern_carries_a_visible_input_with_a_blank_label`
+- [x] `test_sparse_is_genuinely_sparse` — exactly two keys, or it stops testing anything
+- [x] `test_wire_samples_cover_every_shape_the_unit_can_emit`
+- [x] `test_wire_samples_include_a_container_replace_for_every_container_path` — all eight
+- [x] `test_fixtures_carry_no_site_data` — parametrised over both documents. The repo is public
+- [x] `test_the_vendored_package_is_importable_without_home_assistant`
+- [x] `test_the_parent_packages_are_stubbed_when_home_assistant_is_absent` — asserts the stub
+      has no `__file__`, i.e. the real `__init__.py` was bypassed rather than merely tolerated
+
+*Evidence:* 20 tests pass on Windows with `import homeassistant` raising `ModuleNotFoundError`.
+
 ### `protocol.py` — the wire codec
 
 - [ ] `test_a_payload_containing_spaces_is_not_split_further` — `mso {"unitname":"a b c"}`

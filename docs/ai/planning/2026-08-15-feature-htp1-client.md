@@ -33,9 +33,12 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 - *Depends on:* nothing.
 - *Evidence:* fixtures load in a smoke test; suite still green on Windows.
 - *Scenarios:* all of them — every later task reads these fixtures.
-- *Note:* ported from the Control4 driver's `tests/fixtures.lua`, where the values are already
-  invented. **Re-verify before committing**: no real unit name, input label, Dirac slot name or
-  serial. `mso_legacy` must have a slot with the `name` key **absent**, `mso_modern` one with
+- *Note:* **Written from scratch, not ported.** The Control4 driver's `tests/fixtures.lua` has
+  invented values too, but regenerating removes the question entirely rather than answering it
+  by inspection — R5 is closed by construction. Only the *schema* is reused: path names and
+  value domains, which are documented in the design doc and are not site data. Every string is
+  invented here, and `test_fixtures_carry_no_site_data` pins that.
+  `mso_legacy` must have a slot with the `name` key **absent**, `mso_modern` one with
   `name: ""` — different code paths, and T4 tests both.
 
 ### Phase 2: Core Features

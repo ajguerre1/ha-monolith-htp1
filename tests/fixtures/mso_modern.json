@@ -1,0 +1,129 @@
+{
+  "unitname": "Test Processor",
+  "powerIsOn": true,
+  "powerAction": "none",
+  "volume": -25,
+  "muted": false,
+  "input": "h1",
+  "loudness": "off",
+  "bassenhance": "off",
+  "night": "auto",
+  "dialogEnh": 2,
+  "fastStart": "on",
+  "fastStartPassThrough": "off",
+  "secondaryVolume": -40,
+  "crda": "US",
+  "inputs": {
+    "h1": { "label": "Media Player", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "h2": { "label": "Game Console", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "h3": { "label": "Streaming Box", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "h4": { "label": "", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "h5": { "label": "Test Bench", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "h6": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "h7": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "h8": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "a1": { "label": "Turntable", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "a2": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "spdif1": { "label": "Media Player", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "spdif2": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "spdif3": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "optical1": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "optical2": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "optical3": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "aes": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "b": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "tv": { "label": "Television", "visible": true, "disable": false, "delay": 0, "gain": 0 },
+    "usb": { "label": "", "visible": false, "disable": false, "delay": 0, "gain": 0 },
+    "roon": { "label": "Roon", "visible": false, "disable": false, "delay": 0, "gain": 0 }
+  },
+  "upmix": {
+    "select": "native",
+    "off": { "homevis": true },
+    "native": { "homevis": true },
+    "dolby": { "cs": false, "homevis": true },
+    "dts": { "ws": true, "homevis": true },
+    "auro": { "preset": 3, "strength": 13, "homevis": false },
+    "mono": { "homevis": false },
+    "stereo": { "homevis": true }
+  },
+  "eq": {
+    "tc": false,
+    "bass": { "freq": 100, "level": 0 },
+    "treble": { "freq": 8000, "level": 0 }
+  },
+  "bassLpf": 80,
+  "loudnessCal": 75,
+  "loudnessCurve": "iso",
+  "cal": {
+    "vpl": -50,
+    "vph": 0,
+    "zeroPoint": -10,
+    "headroom": 6,
+    "ampsense": 1.6,
+    "lipsync": 40,
+    "currentdiracslot": 1,
+    "diracactive": "on",
+    "num_dirac_slots": 6,
+    "caltoolconnected": false,
+    "filterxferinprogress": false,
+    "slots": [
+      { "name": "Reference" },
+      { "name": "Movie Night" },
+      { "name": "" },
+      { "name": "Music" },
+      { "name": "Late Night" },
+      { "name": "Calibration Test" }
+    ]
+  },
+  "status": {
+    "SurroundMode": "Native Dolby ATMOS",
+    "DECSourceProgram": "Dolby MAT/PCM",
+    "DECProgramFormat": "Object Audio",
+    "DECSampleRate": "48 kHz",
+    "ENCListeningFormat": "5.1.2",
+    "ENCSampleRate": "48 kHz",
+    "DiracState": "on",
+    "raw": {
+      "decoderSampleRateEnum": 2,
+      "delayValues": [0, 0, 12, 0],
+      "activityMask": 0,
+      "formatCode": 17,
+      "DiracError": 0
+    }
+  },
+  "videostat": {
+    "VideoResolution": "3840x2160p60Hz",
+    "VideoColorSpace": "BT2020",
+    "HDRstatus": "HDR10",
+    "VideoMode": "auto",
+    "VideoBitDepth": "10",
+    "Video3D": "--"
+  },
+  "versions": {
+    "avController": "5.96 Built Jul  8 2026, 11:45:00\n",
+    "swVer": "V2.1.1",
+    "SerialNumber": "TESTSN0001"
+  },
+  "channeltrim": { "channels": { "lf": 0, "rf": 0, "c": 0, "ls": 0, "rs": 0 } },
+  "dialnorm": { "enable": "off" },
+  "shaker": { "present": false },
+  "lcvc": { "enable": "off" },
+  "CEC": {
+    "cecOnSw": "off",
+    "allowpwrk": true,
+    "allowvolk": true,
+    "allowsaf": false,
+    "allowinp": true,
+    "allowstdb": true
+  },
+  "hw": { "fpBright": 3 },
+  "svronly": {
+    "lastUsedPage": "settings",
+    "macroNames": { "cmda": "Evening", "cmdb": "Quiet", "preset1": "Reference Preset" },
+    "cmda": [
+      { "op": "replace", "path": "/volume", "value": -30 },
+      { "op": "replace", "path": "/input", "value": "h2" }
+    ],
+    "cmdb": [{ "op": "replace", "path": "/night", "value": "on" }]
+  }
+}

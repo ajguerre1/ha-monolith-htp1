@@ -1,0 +1,182 @@
+{
+  "_comment": [
+    "Message-level corpus. Every entry is the exact text of one WebSocket text frame, except",
+    "`container_replaces`, which is structured so tests can assert per-path behaviour.",
+    "Framing is `verb[space]JSON`, split on the FIRST space only. All values are invented."
+  ],
+
+  "get_mso": "getmso",
+  "verb_with_no_argument": "getmso",
+
+  "mso_document": "mso {\"volume\":-25,\"muted\":false,\"input\":\"h1\",\"powerIsOn\":true}",
+
+  "msoupdate_array": "msoupdate [{\"op\":\"replace\",\"path\":\"/volume\",\"value\":-30}]",
+  "msoupdate_multi_op": "msoupdate [{\"op\":\"replace\",\"path\":\"/volume\",\"value\":-30},{\"op\":\"replace\",\"path\":\"/muted\",\"value\":true}]",
+  "msoupdate_single_unwrapped_op": "msoupdate {\"op\":\"replace\",\"path\":\"/volume\",\"value\":-30}",
+  "msoupdate_remove_op": "msoupdate [{\"op\":\"remove\",\"path\":\"/inputs/h8/label\"}]",
+  "msoupdate_add_op": "msoupdate [{\"op\":\"add\",\"path\":\"/inputs/h8/label\",\"value\":\"Test Bench\"}]",
+
+  "bare_json_document": "{\"volume\":-25,\"muted\":false,\"input\":\"h1\",\"powerIsOn\":true,\"unitname\":\"Test Processor\"}",
+  "bare_json_op_array": "[{\"op\":\"replace\",\"path\":\"/muted\",\"value\":true}]",
+  "bare_json_single_op": "{\"op\":\"replace\",\"path\":\"/muted\",\"value\":true}",
+  "bare_json_unrecognised": "{\"somethingElse\":123,\"notAnOp\":true}",
+
+  "error_bad_verb": "error \"bad-verb\"",
+  "unknown_verb": "wibble {\"a\":1}",
+
+  "value_containing_spaces": "mso {\"unitname\":\"Test Processor Two\"}",
+  "empty_string": "",
+  "only_a_space": " ",
+  "null_argument": "msoupdate null",
+  "invalid_json_argument": "mso {not json",
+  "empty_op_array": "msoupdate []",
+  "lone_bracket": "[",
+
+  "status_raw_push": "msoupdate [{\"op\":\"replace\",\"path\":\"/status/raw/activityMask\",\"value\":3}]",
+  "untracked_path_push": "msoupdate [{\"op\":\"replace\",\"path\":\"/peq/slots/0/channels/lf/gaindB\",\"value\":-2.5}]",
+
+  "input_label_push": "msoupdate [{\"op\":\"replace\",\"path\":\"/inputs/h2/label\",\"value\":\"Streaming Box\"}]",
+  "input_visible_push": "msoupdate [{\"op\":\"replace\",\"path\":\"/inputs/h3/visible\",\"value\":false}]",
+
+  "container_replaces": [
+    {
+      "description": "Whole /status object. Seven tracked leaves must be re-derived, and raw ignored.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/status",
+          "value": {
+            "SurroundMode": "Dolby Surround",
+            "DECSourceProgram": "PCM",
+            "DECProgramFormat": "2.0.0",
+            "DECSampleRate": "44.1 kHz",
+            "ENCListeningFormat": "2.0.0",
+            "ENCSampleRate": "44.1 kHz",
+            "DiracState": "bypass",
+            "raw": { "activityMask": 1, "formatCode": 3 }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Whole /videostat object.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/videostat",
+          "value": {
+            "VideoResolution": "1920x1080p60Hz",
+            "VideoColorSpace": "BT709",
+            "HDRstatus": "--",
+            "VideoMode": "auto",
+            "VideoBitDepth": "8",
+            "Video3D": "--"
+          }
+        }
+      ]
+    },
+    {
+      "description": "Whole /cal object, which carries vpl, vph, the Dirac slot and lipsync.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/cal",
+          "value": {
+            "vpl": -60,
+            "vph": -5,
+            "zeroPoint": -12,
+            "lipsync": 120,
+            "currentdiracslot": 4,
+            "diracactive": "bypass",
+            "slots": [
+              { "name": "Reference" },
+              { "name": "Movie Night" },
+              { "name": "" },
+              { "name": "Music" },
+              { "name": "Late Night" },
+              { "name": "Calibration Test" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "description": "Just the slot array. Must stay six rows and stay aligned with currentdiracslot.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/cal/slots",
+          "value": [
+            { "name": "Reference" },
+            { "name": "Music" },
+            {},
+            { "name": "" },
+            { "name": "Late Night" },
+            { "name": "Calibration Test" }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Whole /inputs map. A partial map must not be read as deleting the rest.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/inputs",
+          "value": {
+            "h1": { "label": "Media Player", "visible": true },
+            "h2": { "label": "Test Bench", "visible": true },
+            "tv": { "label": "Television", "visible": false }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Whole /upmix object, including per-upmixer homevis flags.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/upmix",
+          "value": {
+            "select": "dts",
+            "off": { "homevis": true },
+            "native": { "homevis": false },
+            "dolby": { "cs": true, "homevis": true },
+            "dts": { "ws": true, "homevis": true },
+            "auro": { "preset": 2, "strength": 11, "homevis": true },
+            "mono": { "homevis": false },
+            "stereo": { "homevis": true }
+          }
+        }
+      ]
+    },
+    {
+      "description": "Whole /versions object.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/versions",
+          "value": {
+            "avController": "5.97 Built Aug  1 2026, 08:15:00\n",
+            "swVer": "V2.1.2",
+            "SerialNumber": "TESTSN0001"
+          }
+        }
+      ]
+    },
+    {
+      "description": "Whole /svronly object. Untracked here, but it must not raise.",
+      "ops": [
+        {
+          "op": "replace",
+          "path": "/svronly",
+          "value": {
+            "lastUsedPage": "home",
+            "macroNames": { "cmda": "Evening" },
+            "cmda": [{ "op": "replace", "path": "/volume", "value": -35 }]
+          }
+        }
+      ]
+    }
+  ]
+}
