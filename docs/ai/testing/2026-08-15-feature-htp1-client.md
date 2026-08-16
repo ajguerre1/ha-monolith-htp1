@@ -277,6 +277,8 @@ Driven by an injected fake transport and a controllable clock; no socket.
 - [x] `test_jitter_actually_varies_the_delay`
 - [x] `test_two_clients_do_not_reconnect_in_lockstep` (AC-11)
 - [x] `test_the_same_seed_is_reproducible`
+- [x] `test_previewing_the_ladder_has_no_side_effect` — added at review: previewing twice gives
+      the same answer, and the preview matches what the next real delay turns out to be
 - [x] `test_the_ladder_resets_after_a_successful_connection`
 - [x] `test_the_module_never_seeds_the_global_random_generator` (AC-11) — **by AST**, not
       substring: the module's own docstring contains the words `random.seed()` as a warning

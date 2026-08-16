@@ -17,7 +17,7 @@ in the planning doc.
 | T2 `protocol.py` | **done** | 34 protocol tests + 2 package-hygiene tests; 56 total green; ruff clean |
 | T3 `models.py` | **done** | 47 tests; 103 total green. A failing test found a floating-point tie defect — see below |
 | T4 `mso.py` + `options.py` | **done** | 37 mirror tests + 20 option tests; 160 total green; ruff clean |
-| T5 client: transport | **done** | 22 tests; 182 total green; slowest test 0.04 s. Two API warts flagged for review before T6/T7 build on it |
+| T5 client: transport | **done** | 23 tests; 183 total green; slowest test 0.04 s. Two API warts raised at review and fixed |
 | T6 client: read path | todo | |
 | T7 client: write path | todo | |
 | T8 fake device | todo | |
@@ -231,18 +231,27 @@ supervisor, and therefore indefinite reconnection, begins only after a first doc
 **A reconnect re-sends `getmso`.** State after a gap cannot be assumed unchanged; the front
 panel may have moved things while the link was down.
 
-#### Two warts worth a decision before T6 builds on this
+#### Two API warts, raised at review and fixed before T6
 
-1. **`note_failure()` and `backoff_schedule()` are public because tests needed them.** Both are
-   reasonable operations, but neither has a production caller today, and API shaped by tests
-   tends to stay that way.
-2. **`backoff_schedule()` consumes the client's RNG.** It advances a *local* index copy but
-   draws from `self._rng`, so calling it perturbs the delays a subsequent reconnect will use.
-   Harmless — jitter is jitter — but it means a "preview" method has a side effect, which is
-   the kind of thing that is fine until someone calls it in a diagnostics dump.
+1. **`note_failure()` and `backoff_schedule()` were public because tests needed them.** Neither
+   had a production caller, and API shaped by tests tends to stay that way. Both are now
+   private; the tests reach through the underscore, which is honest about what they are.
+   `backoff_index` was dropped entirely — when diagnostics wants it in M2 it can come back with
+   a real caller.
+2. **`backoff_schedule()` consumed the client's RNG.** It advanced a *local* index copy but drew
+   from `self._rng`, so previewing the ladder changed the delays a real reconnect would use.
+   It now snapshots the generator with `getstate()` and restores it in a `finally`.
 
-Neither is a defect today. Both are cheap to change now and awkward to change once the write
-path depends on the surface.
+The second matters more than it first appears. The obvious future caller is a diagnostics dump —
+"next retry in about N seconds" is exactly what belongs in one — and a preview that perturbs the
+thing it previews is the kind of trap that is only ever found by someone debugging something
+else. `test_previewing_the_ladder_has_no_side_effect` pins both halves: previewing twice gives
+the same answer, and the preview matches what `_next_delay()` actually returns. Confirmed the
+test would have failed against the old implementation rather than assuming it.
+
+The resulting public surface is exactly what the layers above need:
+`allow_writes`, `async_start`, `async_stop`, `connected`, `host`, `mirror`, `reconnecting`,
+`url`.
 
 #### A repeat of an earlier mistake, caught by its own test
 

@@ -207,7 +207,7 @@ async def test_a_dropped_connection_is_re_established_and_re_read():
 
 
 async def test_the_backoff_ladder_climbs_and_caps():
-    delays = _client(FakeSession()).backoff_schedule(8)
+    delays = _client(FakeSession())._backoff_schedule(8)
     nominal = [2, 4, 8, 16, 30, 60, 60, 60]
     for actual, expected in zip(delays, nominal, strict=True):
         assert 0.8 * expected <= actual <= 1.2 * expected, f"{actual} is outside ±20% of {expected}"
@@ -215,31 +215,46 @@ async def test_the_backoff_ladder_climbs_and_caps():
 
 async def test_jitter_actually_varies_the_delay():
     """Fixed delays would make several units reconnect in lockstep after one network blip."""
-    delays = _client(FakeSession()).backoff_schedule(20)
+    delays = _client(FakeSession())._backoff_schedule(20)
     assert len(set(delays)) > 1
 
 
 async def test_two_clients_do_not_reconnect_in_lockstep():
     """Unseeded RNG made two Control4 driver instances reconnect together after every blip."""
-    one = Htp1Client(FakeSession(), "10.0.0.1", seed="unit-one").backoff_schedule(10)
-    two = Htp1Client(FakeSession(), "10.0.0.2", seed="unit-two").backoff_schedule(10)
+    one = Htp1Client(FakeSession(), "10.0.0.1", seed="unit-one")._backoff_schedule(10)
+    two = Htp1Client(FakeSession(), "10.0.0.2", seed="unit-two")._backoff_schedule(10)
     assert one != two
 
 
+async def test_previewing_the_ladder_has_no_side_effect():
+    """A preview that perturbs the thing it previews is a trap.
+
+    The obvious future caller is a diagnostics dump — "next retry in about N seconds" is
+    exactly what belongs in one — and that must not change the delay a real reconnect uses.
+    """
+    client = _client(FakeSession())
+    first = client._backoff_schedule(5)
+    second = client._backoff_schedule(5)
+    assert first == second, "previewing twice must give the same answer"
+
+    # And the preview must match what actually happens next.
+    assert client._next_delay() == pytest.approx(first[0])
+
+
 async def test_the_same_seed_is_reproducible():
-    one = Htp1Client(FakeSession(), "10.0.0.1", seed="same").backoff_schedule(10)
-    two = Htp1Client(FakeSession(), "10.0.0.1", seed="same").backoff_schedule(10)
+    one = Htp1Client(FakeSession(), "10.0.0.1", seed="same")._backoff_schedule(10)
+    two = Htp1Client(FakeSession(), "10.0.0.1", seed="same")._backoff_schedule(10)
     assert one == two
 
 
 async def test_the_ladder_resets_after_a_successful_connection():
     """Otherwise a unit that flaps once sits at the 60 s cap for the rest of the day."""
     client = _client(FakeSession([await _quiet_socket(DOCUMENT)]))
-    client.note_failure()
-    client.note_failure()
-    assert client.backoff_index == 2
+    client._note_failure()
+    client._note_failure()
+    assert client._backoff_index == 2
     await client.async_start()
-    assert client.backoff_index == 0
+    assert client._backoff_index == 0
     await client.async_stop()
 
 
@@ -279,5 +294,5 @@ def test_the_client_does_not_touch_module_level_random():
     random.seed(1234)
     expected = random.random()
     random.seed(1234)
-    Htp1Client(FakeSession(), "10.0.0.1", seed="anything").backoff_schedule(50)
+    Htp1Client(FakeSession(), "10.0.0.1", seed="anything")._backoff_schedule(50)
     assert random.random() == expected

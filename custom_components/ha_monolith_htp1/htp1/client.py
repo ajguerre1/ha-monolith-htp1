@@ -130,10 +130,6 @@ class Htp1Client:
     def allow_writes(self) -> bool:
         return self._allow_writes
 
-    @property
-    def backoff_index(self) -> int:
-        return self._backoff_index
-
     # -- lifecycle -----------------------------------------------------------------------
 
     async def async_start(self, *, wait_for_first_document: bool = True) -> None:
@@ -168,15 +164,25 @@ class Htp1Client:
 
     # -- backoff -------------------------------------------------------------------------
 
-    def backoff_schedule(self, count: int) -> list[float]:
-        """The next `count` delays, without connecting. Exposed so the ladder is testable."""
-        index, delays = self._backoff_index, []
-        for _ in range(count):
-            delays.append(self._jittered(self._backoff[min(index, len(self._backoff) - 1)]))
-            index += 1
-        return delays
+    def _backoff_schedule(self, count: int) -> list[float]:
+        """The next `count` delays, without connecting and **without side effects**.
 
-    def note_failure(self) -> None:
+        The generator is snapshotted and restored, so previewing the ladder cannot change the
+        delays a real reconnect will use. That matters because the obvious future caller is a
+        diagnostics dump — "next retry in about N seconds" is exactly what belongs in one — and
+        a preview that quietly perturbs the thing it is previewing is a trap.
+        """
+        state = self._rng.getstate()
+        try:
+            index, delays = self._backoff_index, []
+            for _ in range(count):
+                delays.append(self._jittered(self._backoff[min(index, len(self._backoff) - 1)]))
+                index += 1
+            return delays
+        finally:
+            self._rng.setstate(state)
+
+    def _note_failure(self) -> None:
         self._backoff_index += 1
 
     def _jittered(self, delay: float) -> float:
