@@ -18,12 +18,12 @@ import sys
 
 import pytest
 
-# `tests/` deliberately has no __init__.py, so pytest collects with the directory on sys.path
-# and conftest is a top-level module here rather than a relative import.
-from conftest import DOMAIN, HA_AVAILABLE, REPO_ROOT
+# Imported from support rather than conftest: `tests/ha/conftest.py` resolves under the same
+# top-level name, so `from conftest import ...` picks up whichever was imported first.
+from support import CLIENT_DIR, DOMAIN, home_assistant_available
 
+HA_AVAILABLE = home_assistant_available()
 PACKAGE = f"custom_components.{DOMAIN}"
-CLIENT_DIR = REPO_ROOT / "custom_components" / DOMAIN / "htp1"
 
 
 def _home_assistant_imports(source: str) -> list[str]:
