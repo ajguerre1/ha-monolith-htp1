@@ -25,7 +25,7 @@ in the planning doc.
 | T9 integration tests | **done** | 13 tests over loopback; found a real gap in the client |
 | T10 probe script | **done** | 9 tests; 263 total green. Verified against the fake over a real socket |
 | T11 probe the five units (read-only) | **done** | Run 2026-08-16 with approval. HW-02, HW-03, HW-04, HW-07 closed with measurements |
-| T12 reconcile | todo | |
+| T12 reconcile, Phase 7 check, Phase 8 coverage | **done** | 280 tests, 98 % coverage of `htp1/`. A traceability audit found 9 of 21 criteria naming tests that no longer existed |
 
 ## Development Setup
 
@@ -464,6 +464,30 @@ work rather than a discovery.
 
 **Nothing measured reached the repository.** The per-unit map of address, unit name, serial and
 firmware went to gitignored `local/fleet-map.md`, written without echoing names to the terminal.
+
+### T12 — reconcile, and what the closing checks found
+
+Two audits, both of which found something.
+
+**Traceability (Phase 7).** The requirements doc maps every acceptance criterion to the test that
+proves it. Auditing that mapping mechanically found **9 of 21 criteria naming tests that no
+longer exist** — every one a rename or a split as behaviour got sharper, none a genuine gap. But
+that is the point: a reader auditing the table would have had to establish that nine times, and
+the tenth might have been real.
+
+Fixed by correcting the names *and* by adding `tests/test_traceability.py`, which parses the doc
+and the test files and fails if a criterion names a test that is not defined. The table is now
+enforced rather than maintained by hand, with its own scanner-sanity test so it cannot pass
+vacuously.
+
+**Coverage (Phase 8).** `mso.py` was the weakest module at 88 %, and the missing lines were real
+device behaviours rather than dead code: `remove` operations, per-slot `/cal/slots/<n>/name`
+pushes, and per-mode `/upmix/<mode>/homevis` pushes. `wire_samples.json` had carried a `remove`
+sample since T1 that no test ever applied to the mirror. Ten new tests took it to 99 %, and the
+package to 98 %.
+
+The remaining twelve statements are abstract-method stubs and double-invocation guards. They are
+listed individually in the testing doc with a reason each, rather than rounded away.
 
 ### Patterns
 

@@ -96,27 +96,27 @@ has a passing test**, not when the code looks right.
 
 | # | Acceptance criterion | Test |
 |---|---|---|
-| AC-01 | Connect/handshake is abandoned after 15 s | `test_handshake_timeout_fires_when_the_socket_never_upgrades` |
-| AC-02 | A write equal to the current **optimistic** value is not sent; see Q5 | `test_600_identical_volume_writes_send_nothing` |
+| AC-01 | Connect/handshake is abandoned after 15 s | `test_a_socket_that_never_upgrades_times_out`, `test_the_handshake_timeout_fires_against_a_socket_that_never_upgrades` |
+| AC-02 | A write equal to the current **optimistic** value is not sent; see Q5 | `test_six_hundred_identical_writes_send_nothing`, `test_the_guard_compares_the_optimistic_value_not_the_confirmed_one` |
 | AC-03 | dB→fraction→dB round-trips exactly for **every** integer dB, over `(-50,0)`, `(-80,10)` and `(-127,0)`. The fraction is an **unrounded float**; see Q4 | `test_every_db_survives_a_round_trip` |
 | AC-04 | Converting a fraction to dB rounds every exact `.5` tie **down** | `test_ties_round_down_never_up` |
 | AC-05 | Writes coalesce by path within the 50 ms window; last value wins; one `changemso` per flush | `test_writes_to_one_path_coalesce_to_the_last_value` |
 | AC-06 | An empty op array is never sent | `test_a_flush_with_nothing_to_say_sends_nothing` |
 | AC-07 | Only `replace` ops are emitted | `test_only_replace_operations_are_emitted` |
-| AC-08 | An unconfirmed write is rolled back and re-read after 2 s; the timer re-arms per flush | `test_an_unconfirmed_write_is_rolled_back`, `test_reconcile_deadline_is_per_flush` |
-| AC-09 | Consecutive parse failures stop at 3; the error path's own retry does **not** reset the budget; a deliberate re-request does | `test_parse_failures_stop_at_three`, `test_the_error_path_retry_does_not_reset_the_budget`, `test_a_deliberate_refresh_restores_the_budget` |
+| AC-08 | An unconfirmed write is rolled back and re-read after 2 s; the timer re-arms per flush | `test_an_unconfirmed_write_is_rolled_back`, `test_the_reconcile_deadline_is_re_armed_per_flush` |
+| AC-09 | Consecutive parse failures stop at 3; the error path's own retry does **not** reset the budget; a deliberate re-request does | `test_the_budget_is_three`, `test_the_cap_is_logged_exactly_once`, `test_the_error_path_retry_does_not_reset_the_budget`, `test_a_deliberate_refresh_restores_the_budget` |
 | AC-10 | The write queue is discarded on disconnect, never replayed | `test_the_queue_does_not_survive_a_disconnect` |
-| AC-11 | Backoff follows 2/4/8/16/30/60 s with ±20 % jitter from a per-client RNG; two clients with different seeds diverge; no global RNG is touched | `test_backoff_ladder_and_jitter_bounds`, `test_two_clients_do_not_reconnect_in_lockstep`, `test_module_never_calls_random_seed` |
+| AC-11 | Backoff follows 2/4/8/16/30/60 s with ±20 % jitter from a per-client RNG; two clients with different seeds diverge; no global RNG is touched | `test_the_backoff_ladder_climbs_and_caps`, `test_two_clients_do_not_reconnect_in_lockstep`, `test_the_module_never_seeds_the_global_random_generator` |
 | AC-12 | A missing path disables its feature and raises nothing; the sparse fixture loads | `test_a_sparse_document_loads_without_error` |
-| AC-13 | A container replace re-derives every tracked leaf beneath it, for all eight container paths | `test_container_replace_rederives_every_leaf` |
+| AC-13 | A container replace re-derives every tracked leaf beneath it, for all eight container paths | `test_a_status_container_replace_rederives_every_leaf`, `test_a_cal_container_replace_rederives_leaves_and_slots`, `test_every_container_path_is_declared` |
 | AC-14 | `/cal/slots` always yields six positional rows, for empty-name and absent-name shapes alike | `test_slots_are_always_six_rows` |
 | AC-15 | A message is split on the **first** space only | `test_a_payload_containing_spaces_is_not_split_further` |
-| AC-16 | `error "bad-verb"`, bare JSON, and unknown shapes are survived, never raised | `test_the_client_survives_everything_the_unit_can_say` |
+| AC-16 | `error "bad-verb"`, bare JSON, and unknown shapes are survived, never raised | `test_parse_never_raises`, `test_an_error_frame_does_not_spend_budget`, `test_an_unknown_shape_does_not_spend_budget` |
 | AC-17 | A no-op push produces an empty change set and notifies nobody | `test_a_push_that_changes_nothing_notifies_nobody` |
 | AC-18 | A read-only client refuses every write before sending a byte | `test_a_read_only_client_refuses_every_write` |
 | AC-19 | The package imports no Home Assistant | `test_the_client_package_imports_no_home_assistant` |
 | AC-20 | A write attempted while disconnected raises rather than queueing silently; see Q6 | `test_writing_while_disconnected_raises` |
-| AC-21 | The probe script never constructs a write-enabled client and never calls a write method | `test_the_probe_is_read_only_by_construction` |
+| AC-21 | The probe script never constructs a write-enabled client and never calls a write method | `test_the_probe_never_mentions_allow_writes`, `test_the_probe_never_calls_a_write_method` |
 
 **Performance:** applying a `msoupdate` for an untracked path (e.g. `/status/raw/...`) must not
 walk the document — a dict lookup and at most two anchored regex matches. The ~47 KB `mso`

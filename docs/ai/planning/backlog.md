@@ -34,9 +34,6 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 
 | ID | Pri | Item | Notes |
 |----|-----|------|-------|
-| `M1-01` | H | Vendored client: `protocol.py`, `models.py`, `mso.py`, `client.py` | Feature `htp1-client`. Test-first. No Home Assistant imports. |
-| `M1-02` | H | Port MSO fixtures `modern` / `legacy` / `sparse` from the Control4 driver's `tests/fixtures.lua` to JSON | Already sanitised there; re-check before committing. |
-| `M1-03` | H | Port `tools/fake-htp1.py`, adding the `accept-tcp-no-upgrade` fault | That fault is the only way to prove the 15 s handshake timeout fires. |
 | `M2-01` | H | Integration core: coordinator, entity base, config flow, diagnostics, strings | Feature `integration-core`. |
 | `M3-01` | H | Five entity platforms, description-table driven | Feature `entity-platforms`. |
 | `M4-01` | H | Live validation and cutover from `monoprice_htp1` | Feature `live-cutover`. Old integration's files stay on disk as rollback. |
@@ -54,6 +51,11 @@ unit only** (named in the gitignored `local/lab-unit.md`), after asking.
 | `HW-03` | **No MAC address anywhere in the document** | `probe_htp1.py` plus a loose scan for MAC-shaped values and `*mac*` keys: the only matches are `/inputs/*/macro`. `/network/eth0` carries `dhcp`, `addr`, `mask`, `gw` and nothing else, and `addr`/`mask`/`gw` are empty strings. **Consequence: DHCP self-heal is not buildable from the document.** The README must recommend a reservation and must not imply a self-heal; `"dhcp": [{"registered_devices": true}]` needs a MAC to register as a device connection. |
 | `HW-04` | Volume range measured: **`vpl = -50`, `vph = 0` on all five** | `probe_htp1.py summary` ×5, 2026-08-16. Matches the value the design assumed, now confirmed rather than assumed. Still read live — they remain user-configurable. |
 | `HW-07` | `/status` vocabulary captured from all five | Observed: `SurroundMode` ∈ {`Native Dolby ATMOS`, `Dolby Surround`}, `DECSourceProgram` ∈ {`Dolby MAT/PCM`, `PCM`}, `DECProgramFormat` ∈ {`Object Audio`, `2.0.0`}, `ENCListeningFormat` ∈ {`3.1.2`, `5.1.2`, `5.2.2t`, `7.2.2`}, sample rates `48 kHz`, `DiracState` `off`. Free-text sensors, as designed — `5.2.2t` is exactly why they are not enumerated. |
+| `M1-01` | Vendored client: `protocol.py`, `models.py`, `mso.py`, `options.py`, `client.py` | 280 tests, 98 % coverage of `htp1/`, no Home Assistant import (`test_the_client_package_imports_no_home_assistant`) |
+| `M1-02` | MSO fixtures written from scratch, not ported | `tests/fixtures/{mso_modern,mso_legacy,mso_sparse,wire_samples}.json`; `test_fixtures_carry_no_site_data` |
+| `M1-03` | Fake device with fault injection, incl. `accept-tcp-no-upgrade` | `tools/fake_htp1.py`; `test_the_handshake_timeout_fires_against_a_socket_that_never_upgrades` proves AC-01 over a real socket |
+| `M1-04` | Read-only probe, run against all five units | `scripts/probe_htp1.py`; HW-02/03/04/07 closed 2026-08-16 |
+| `M1-05` | Acceptance-criteria traceability enforced | `tests/test_traceability.py`. The audit that motivated it found 9 of 21 criteria naming tests that no longer existed |
 | `M0-01` | AI DevKit initialized, all 7 phases, 20 built-in skills | `npx ai-devkit@latest lint` → "All checks passed"; `skill list` → 20 skills incl. every `dev-*` phase skill |
 | `M0-02` | Brand icons generated so the HACS `brands` check passes from this repo | `scripts/make_brand_icons.py` → `brand/icon.png` 256×256 RGBA, `icon@2x.png` 512×512 RGBA. CI run 31918079021 failed `brands` (8/9); run **31918223147** on commit `7acaf56` → "All (9) checks passed". |
 | `M0-03` | Repository published and CI green end to end | `ajguerre1/ha-monolith-htp1`, public, description + 8 topics. CI run **31918223147**: hassfest ✓, HACS ✓, ruff ✓, pytest ✓ (6 tests), strings parity ✓. |

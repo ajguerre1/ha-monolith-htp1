@@ -163,6 +163,109 @@ def test_applying_nothing_is_harmless(modern):
     assert modern.apply_ops(None) == frozenset()
 
 
+def test_operations_that_are_not_operations_are_skipped(modern):
+    """`normalise_ops` filters most of this, but the mirror is fed from more than one place."""
+    changed = modern.apply_ops(
+        [
+            "not a dict",
+            42,
+            None,
+            {"op": "replace"},  # no path
+            {"op": "replace", "path": 99},  # path is not a string
+            {"op": "replace", "path": "/volume", "value": -31},  # the only real one
+        ]
+    )
+    assert changed == frozenset({"volume"})
+    assert modern.get("volume") == -31
+
+
+def test_a_document_that_is_not_an_object_is_ignored():
+    mirror = MsoMirror()
+    assert mirror.apply_document(None) == frozenset()
+    assert mirror.apply_document([1, 2, 3]) == frozenset()
+    assert mirror.loaded is False
+
+
+# --------------------------------------------------------------------------------------
+# Leaf pushes the unit can send but nothing exercised until the M1 coverage review
+# --------------------------------------------------------------------------------------
+
+
+def test_a_remove_op_clears_the_field_and_marks_it_absent(modern, wire_samples):
+    """`remove` is rarer than `replace` but real, and it means the feature is gone.
+
+    Clearing the value without also clearing `has()` would leave an entity reporting unknown
+    forever instead of disappearing.
+    """
+    assert modern.has("input") is True
+    changed = modern.apply_ops(_ops('msoupdate [{"op":"remove","path":"/input"}]'))
+    assert changed == frozenset({"input"})
+    assert modern.get("input") is None
+    assert modern.has("input") is False
+
+
+def test_removing_an_input_leaf_is_survivable(modern, wire_samples):
+    assert modern.apply_ops(_ops(wire_samples["msoupdate_remove_op"])) is not None
+
+
+def test_an_add_op_is_applied_like_a_replace(modern, wire_samples):
+    """The unit sends `add` for a member that did not exist. Reading it is harmless."""
+    modern.apply_ops(_ops(wire_samples["msoupdate_add_op"]))
+    assert modern.inputs["h8"].label == "Test Bench"
+
+
+def test_a_single_slot_push_updates_only_that_slot(modern):
+    """`/cal/slots/3/name` is a leaf push, distinct from replacing the whole array."""
+    before = [slot.name for slot in modern.dirac_slots]
+    changed = modern.apply_ops(
+        _ops('msoupdate [{"op":"replace","path":"/cal/slots/3/name","value":"Late Night"}]')
+    )
+    assert changed == frozenset({"dirac_slots"})
+    after = [slot.name for slot in modern.dirac_slots]
+    assert after[3] == "Late Night"
+    assert after[:3] == before[:3] and after[4:] == before[4:]
+    assert len(modern.dirac_slots) == 6
+
+
+def test_a_slot_push_that_changes_nothing_is_silent(modern):
+    changed = modern.apply_ops(
+        _ops('msoupdate [{"op":"replace","path":"/cal/slots/1/name","value":"Movie Night"}]')
+    )
+    assert changed == frozenset()
+
+
+def test_a_slot_index_outside_the_array_is_ignored(modern):
+    """`/cal/currentdiracslot` indexes six rows; anything else is not ours to invent."""
+    changed = modern.apply_ops(
+        _ops('msoupdate [{"op":"replace","path":"/cal/slots/9/name","value":"Nope"}]')
+    )
+    assert changed == frozenset()
+    assert len(modern.dirac_slots) == 6
+
+
+def test_a_visibility_push_for_one_upmix_mode_is_applied(modern):
+    assert modern.upmix_visible["auro"] is False
+    changed = modern.apply_ops(
+        _ops('msoupdate [{"op":"replace","path":"/upmix/auro/homevis","value":true}]')
+    )
+    assert changed == frozenset({"upmix_visible"})
+    assert modern.upmix_visible["auro"] is True
+
+
+def test_an_upmix_visibility_push_that_changes_nothing_is_silent(modern):
+    changed = modern.apply_ops(
+        _ops('msoupdate [{"op":"replace","path":"/upmix/dolby/homevis","value":true}]')
+    )
+    assert changed == frozenset()
+
+
+def test_the_versions_view_is_normalised(modern):
+    versions = modern.versions
+    assert versions.serial == "TESTSN0001"
+    assert versions.system == "V2.1.1"
+    assert versions.av_controller == "5.96"
+
+
 # --------------------------------------------------------------------------------------
 # Container replaces
 # --------------------------------------------------------------------------------------

@@ -22,7 +22,15 @@ import inspect
 import random
 
 import pytest
-from fakes import CLOSED, FakeSession, FakeWebSocket, RecordingSleeper, text
+from aiohttp import WSMsgType
+from fakes import (
+    CLOSED,
+    FakeMessage,
+    FakeSession,
+    FakeWebSocket,
+    RecordingSleeper,
+    text,
+)
 
 from custom_components.ha_monolith_htp1.htp1 import client as client_module
 from custom_components.ha_monolith_htp1.htp1.client import (
@@ -150,6 +158,35 @@ async def test_the_reconnect_ladder_only_starts_after_the_first_document():
     assert client.reconnecting is True
     await client.async_stop()
     assert client.reconnecting is False
+
+
+async def test_starting_twice_is_a_no_op():
+    """Home Assistant can retry a setup that is already in flight; a second socket would leak."""
+    socket = await _quiet_socket(DOCUMENT)
+    session = FakeSession([socket])
+    client = _client(session)
+
+    await client.async_start()
+    await client.async_start()
+
+    assert len(session.calls) == 1
+    await client.async_stop()
+
+
+async def test_a_binary_frame_is_ignored_rather_than_fatal():
+    """Binary frames are not part of this protocol, but the unit is not ours to police."""
+    socket = FakeWebSocket([text(DOCUMENT)])
+    socket.hold_open = True
+    client = _client(FakeSession([socket]))
+    await client.async_start()
+
+    socket.feed(FakeMessage(WSMsgType.BINARY, b"\x00\x01\x02"))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert client.connected is True
+    assert client._parse_failures == 0, "a binary frame is not a decoding failure"
+    await client.async_stop()
 
 
 async def test_stop_is_idempotent():

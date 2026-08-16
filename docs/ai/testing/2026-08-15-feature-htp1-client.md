@@ -447,6 +447,37 @@ goes to gitignored `scripts/output/`.
 timing tests (with a controllable clock, so no test sleeps), and `tools/fake-htp1.py` over a
 real socket for integration tests. There is no mocking of `aiohttp` internals.
 
+## Coverage — measured at the close of M1
+
+```
+custom_components/ha_monolith_htp1/htp1/__init__.py     6 stmts    0 miss   100%
+custom_components/ha_monolith_htp1/htp1/protocol.py    87 stmts    0 miss   100%
+custom_components/ha_monolith_htp1/htp1/options.py     32 stmts    0 miss   100%
+custom_components/ha_monolith_htp1/htp1/mso.py        217 stmts    2 miss    99%
+custom_components/ha_monolith_htp1/htp1/client.py     319 stmts    8 miss    97%
+custom_components/ha_monolith_htp1/htp1/models.py      69 stmts    2 miss    97%
+                                              TOTAL  730 stmts   12 miss    98%
+```
+
+**The coverage review found real gaps, not just numbers.** `mso.py` started at 88 %, and what was
+missing turned out to be device behaviours nothing exercised: `remove` operations, per-slot
+`/cal/slots/<n>/name` pushes, and per-mode `/upmix/<mode>/homevis` pushes. `wire_samples.json`
+already contained a `remove` sample that no test ever applied to the mirror. Ten tests were added
+and it rose to 99 %.
+
+**The twelve remaining statements are justified, not deferred:**
+
+| Where | What | Why it stays uncovered |
+|---|---|---|
+| `models.py` 121, 124 | `Codec.matches` / `Codec.encode` raising `NotImplementedError` | Abstract base methods. Both concrete codecs override them; reaching these means someone subclassed `Codec` and forgot, which the exception exists to say |
+| `client.py` 346–348 | `send_str` raising during a flush | Requires a socket that accepts a write and then fails mid-call. The disconnect path is covered; this is the narrower race, and faking it would test the fake |
+| `client.py` 402, 576 | Early returns in `_reconcile` and `_teardown` when there is nothing to do | Guards against double-invocation, reached only by an ordering that no caller produces |
+| `client.py` 150, 480, 529 | `host` property; re-raise of an already-typed error; `receive()` raising | Trivial accessor and two re-raise paths |
+| `mso.py` 327, 345 | Container replace with a non-dict value; a `/cal` container whose slots are unchanged | Both are reached only when the unit sends a well-formed container that changes nothing |
+
+Chasing these to 100 % would mean writing tests that assert the shape of defensive code rather
+than any behaviour a device can produce.
+
 ## Test Reporting & Coverage
 
 ```bash
