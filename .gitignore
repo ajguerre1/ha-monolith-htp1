@@ -1,0 +1,46 @@
+# Nimbalyst local scratch (plans, session artifacts) — not part of the project history
+nimbalyst-local/
+
+# Claude Code local settings (machine-local permissions/overrides)
+.claude/settings.local.json
+
+# AI DevKit built-in skills are vendored by `npx ai-devkit@latest init -a -e claude --built-in`.
+# They are third-party content and this repo is public, so they are not republished here.
+# Our own project skill IS tracked — see the negation below.
+.claude/skills/*
+!.claude/skills/monolith-htp1/
+
+# Probe output and captured protocol transcripts contain site data: unit names, input labels,
+# Dirac slot names and serial numbers. Sanitised fixtures live in tests/fixtures/ and ARE
+# committed; raw captures are not.
+scripts/output/
+*.raw.log
+secrets.yaml
+secrets.local.json
+**/secrets.local.json
+.env
+
+# Local-only working copies that legitimately contain real hosts, room names and entity maps.
+local/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]  # Home Assistant config-flow style relies on calls in argument defaults
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+"tools/*" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

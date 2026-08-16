@@ -1,0 +1,15 @@
+# Test dependencies.
+#
+# pytest-homeassistant-custom-component pulls in Home Assistant itself, which cannot be
+# imported on Windows (homeassistant.runner imports POSIX-only fcntl). It is therefore
+# installed in CI (Ubuntu) rather than on the Windows dev box. The vendored htp1 client has
+# no Home Assistant imports and its tests run anywhere.
+#
+# `websockets` is used only by tools/fake-htp1.py, the local fake device. It must never
+# reach manifest.json, which stays requirements: [].
+
+pytest>=8.0
+pytest-asyncio>=0.24
+ruff>=0.7
+websockets>=13.0
+pytest-homeassistant-custom-component>=0.13
