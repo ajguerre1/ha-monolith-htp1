@@ -387,8 +387,8 @@ async def test_a_sleeping_unit_does_not_claim_the_input_is_unplugged(
 ):
     """Off and unplugged are different things, and power is checked first.
 
-    Announcing "No Input Connected" for a sleeping processor would be a confident statement
-    about the cabling, made on no evidence at all.
+    Announcing a signal state for a sleeping processor would describe a picture nobody is
+    sending, on no evidence at all. Off is its own answer.
     """
     await _setup(hass, config_entry, mock_client)
 

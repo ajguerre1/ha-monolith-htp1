@@ -136,8 +136,9 @@ The document is not uniform, and 1.13.x is not 2.1.x.
 
   On a dashboard, `unknown` for the video readings is worth replacing with words. It is not a
   transient gap — an input with nothing on it stays that way — and `unknown` reads like a fault.
-  Note the processor cannot distinguish an unplugged input from a connected source that has gone
-  to sleep, so whatever wording is chosen has to be true of both.
+  **Say "No Signal" rather than anything about cabling:** the processor cannot distinguish an
+  unplugged input from a connected source that has gone to sleep, so a claim about what is
+  plugged in is a guess wearing the costume of a reading.
 - **Lip sync lives in two places and the unit pairs neither direction.** Writing `/cal/lipsync`
   alone moved it 0 → 120 while all 21 inputs stayed at `delay: 0`. Write `/cal/lipsync` and
   `/inputs/<current>/delay` together, in one message.

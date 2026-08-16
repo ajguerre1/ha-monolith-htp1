@@ -34,10 +34,11 @@ PARALLEL_UPDATES = 0
 
 # What the video sensors say when the unit reports no picture on the selected input.
 #
-# Note this is the same state whether nothing is plugged in or a connected source has simply
-# gone to sleep — the processor cannot tell those apart and neither can we. Named here so the
-# wording is a one-line change.
-NO_SIGNAL = "No Input Connected"
+# Deliberately "No Signal" rather than anything about cabling. The processor cannot distinguish
+# an unplugged input from a connected source that has gone to sleep — both produce the same
+# padded dashes — so the wording has to be true of both, and a claim about what is plugged in
+# would be a guess dressed up as a reading.
+NO_SIGNAL = "No Signal"
 
 
 @dataclass(frozen=True, kw_only=True)
