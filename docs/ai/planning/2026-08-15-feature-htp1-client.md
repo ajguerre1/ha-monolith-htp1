@@ -15,7 +15,7 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 ## Milestones
 
 - [x] **M1.A Foundations** — fixtures and the Windows-safe test harness (T1)
-- [ ] **M1.B Pure layers** — `protocol.py` ✅, `models.py`, `mso.py` (T2–T4). No I/O, no async
+- [x] **M1.B Pure layers** — `protocol.py`, `models.py`, `mso.py`, `options.py` (T2–T4)
 - [ ] **M1.C The client** — transport, read path, write path (T5–T7)
 - [ ] **M1.D Tools** — fake device, integration tests, probe script (T8–T10)
 - [ ] **M1.E Measure** — read-only probe of all five units; close HW-02/03/04/07 (T11)
@@ -27,9 +27,9 @@ Every task is **test-first** (`tdd`). A task is done when its tests pass and `ru
 |---|---|---|
 | T1 fixtures and harness | **done** | Fixtures regenerated rather than ported, at the user's direction — closes R5 by construction |
 | T2 `protocol.py` | **done** | 34 tests. Split `MALFORMED` from `UNKNOWN`, which the plan had not called out |
-| T3 `models.py` | next | |
-| T4 `mso.py` | not started | |
-| T5–T7 client | not started | |
+| T3 `models.py` | **done** | A failing test found a floating-point tie defect review had missed |
+| T4 `mso.py` + `options.py` | **done** | `options.py` was not a planned module; the design put these functions in `models.py`, but they consume the mirror's collections |
+| T5–T7 client | next | |
 | T8–T10 tools | not started | |
 | T11 probe live | **blocked — needs approval**, by design | |
 | T12 reconcile | not started | |

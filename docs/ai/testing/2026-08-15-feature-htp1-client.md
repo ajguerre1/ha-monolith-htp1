@@ -137,25 +137,95 @@ sharper. 34 tests.
 > the first. `test_a_codec_can_tell_whether_the_wire_shape_matched_its_declaration` covers the
 > detection half here; T4 covers the reporting half.
 
-### `mso.py` — mirror and patch applier
+### `mso.py` — mirror and patch applier (T4) — **complete**
 
-- [ ] `test_the_three_fixtures_load_without_error` — modern, legacy, sparse (AC-12)
-- [ ] `test_a_sparse_document_loads_without_error` — `{"volume": -10, "powerIsOn": false}` only
-- [ ] `test_legacy_firmware_has_no_video_fields` — `videostat` absent, nothing raises
-- [ ] `test_container_replace_rederives_every_leaf` — parametrised over all eight container
-      paths (AC-13)
-- [ ] `test_absent_keys_are_unspecified_not_cleared` — a partial `/inputs` replace must not
-      wipe labels it did not mention
-- [ ] `test_a_full_document_is_a_census` — the one case where members *may* be dropped
-- [ ] `test_a_single_unwrapped_op_is_accepted`
-- [ ] `test_slots_are_always_six_rows` — for the empty-`name` fixture *and* the absent-`name`
-      fixture; both are different code paths (AC-14)
-- [ ] `test_slot_indices_stay_aligned_with_currentdiracslot`
-- [ ] `test_a_push_that_changes_nothing_notifies_nobody` — empty change set (AC-17)
-- [ ] `test_the_change_set_is_exactly_the_fields_that_moved`
-- [ ] `test_status_raw_is_never_walked` — a `/status/raw/...` push changes nothing and allocates
-      nothing
-- [ ] `test_unknown_paths_are_dropped_silently`
+37 tests.
+
+*Loading*
+- [x] `test_a_fresh_mirror_is_not_loaded`
+- [x] `test_the_three_fixtures_load_without_error` (AC-12)
+- [x] `test_a_modern_document_populates_the_fields_we_read`
+- [x] `test_string_valued_switches_decode_to_booleans` — `/loudness`, `/bassenhance`
+- [x] `test_version_strings_are_normalised`
+- [x] `test_a_sparse_document_loads_without_error`
+- [x] `test_legacy_firmware_has_no_video_fields` — absent disables, never raises
+- [x] `test_the_legacy_volume_range_is_read_from_the_unit` — `-60..-5`; anything hardcoding
+      `-50..0` fails here
+
+*Change sets*
+- [x] `test_the_change_set_is_exactly_the_fields_that_moved`
+- [x] `test_a_push_that_changes_nothing_notifies_nobody` (AC-17)
+- [x] `test_multiple_moved_fields_all_appear`
+- [x] `test_a_single_unwrapped_op_is_accepted`
+- [x] `test_status_raw_is_never_walked`
+- [x] `test_unknown_paths_are_dropped_silently`
+- [x] `test_applying_nothing_is_harmless`
+
+*Container replaces* (AC-13) — one test per subtree rather than one parametrised test, since
+each asserts different leaves
+- [x] `test_every_container_path_is_declared` — all eight
+- [x] `test_a_status_container_replace_rederives_every_leaf`
+- [x] `test_a_cal_container_replace_rederives_leaves_and_slots`
+- [x] `test_a_videostat_container_replace_rederives_every_leaf`
+- [x] `test_a_versions_container_replace_rederives_and_normalises`
+- [x] `test_an_upmix_container_replace_rederives_selection_and_visibility`
+- [x] `test_a_slots_container_replace_keeps_six_rows`
+- [x] `test_an_svronly_container_replace_does_not_raise` — untracked, but it arrives
+- [x] `test_absent_keys_are_unspecified_not_cleared`
+- [x] `test_a_full_document_is_a_census`
+
+*Dirac slots* (AC-14)
+- [x] `test_slots_are_always_six_rows` — parametrised over both firmware shapes
+- [x] `test_slot_indices_stay_aligned_with_currentdiracslot`
+- [x] `test_a_slot_with_no_name_key_survives_as_an_empty_name`
+- [x] `test_a_missing_slot_array_still_yields_six_rows`
+
+*Inputs*
+- [x] `test_inputs_are_projected_with_labels_and_visibility`
+- [x] `test_an_input_label_push_moves_only_that_input`
+- [x] `test_an_input_visibility_push_is_reported`
+
+*Codec mismatch* — moved here from `models.py`, because "report once" is state
+- [x] `test_a_codec_mismatch_is_reported_once` (guards HW-02)
+- [x] `test_a_matching_codec_reports_no_mismatch`
+
+*The path table*
+- [x] `test_every_tracked_path_is_an_absolute_json_pointer`
+- [x] `test_field_names_are_unique`
+
+### `options.py` — dropdown construction (T4) — **complete**
+
+20 tests. Not foreseen as a separate module when this document was written: the design listed
+these functions under `models.py`, but they consume the mirror's collections, so they landed
+with T4.
+
+- [x] `test_only_visible_inputs_are_offered`
+- [x] `test_a_blank_label_falls_back_to_a_readable_default`
+- [x] `test_duplicate_labels_are_disambiguated_on_every_collision` — every member, not just the
+      later one, which would depend on iteration order
+- [x] `test_a_label_that_is_unique_is_left_alone`
+- [x] `test_the_order_is_canonical_not_dictionary_order` — the same inputs in two orders produce
+      identical lists
+- [x] `test_the_current_input_is_offered_even_when_invisible`
+- [x] `test_the_current_input_is_offered_even_when_absent_from_the_document`
+- [x] `test_an_unknown_input_key_still_gets_a_label`
+- [x] `test_no_inputs_at_all_is_an_empty_list_not_an_error`
+- [x] `test_a_mode_the_unit_hides_is_not_offered`
+- [x] `test_a_mode_with_no_visibility_flag_is_shown` — **the rule**, see below
+- [x] `test_sound_mode_order_is_canonical`
+- [x] `test_the_current_sound_mode_is_offered_even_when_hidden`
+- [x] `test_sound_mode_labels_map_back_to_wire_keys`
+- [x] `test_every_slot_is_offered_with_its_wire_index`
+- [x] `test_duplicate_slot_names_stay_unique_for_free`
+- [x] `test_the_current_slot_resolves_by_position_not_by_name` — parametrised
+- [x] `test_an_out_of_range_current_slot_reports_nothing_rather_than_the_wrong_one`
+
+> **Spec ambiguity found by a failing test.** Two tests here contradicted each other about
+> whether a *missing* `homevis` means hidden or shown. Resolved to **absent means visible**:
+> firmware 1.13.x omits the flag entirely, and there is no way to distinguish "this firmware
+> does not report visibility" from "this mode is hidden". Defaulting to hidden empties the whole
+> dropdown on that firmware; defaulting to visible costs one unwanted entry. The failure is
+> asymmetric, so the tolerant default wins.
 
 ### `client.py` — transport, queue, timers
 

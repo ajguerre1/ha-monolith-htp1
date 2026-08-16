@@ -16,7 +16,7 @@ in the planning doc.
 | T1 fixtures and test harness | **done** | 20 tests pass on Windows with Home Assistant absent; ruff check + format clean |
 | T2 `protocol.py` | **done** | 34 protocol tests + 2 package-hygiene tests; 56 total green; ruff clean |
 | T3 `models.py` | **done** | 47 tests; 103 total green. A failing test found a floating-point tie defect — see below |
-| T4 `mso.py` | todo | |
+| T4 `mso.py` + `options.py` | **done** | 37 mirror tests + 20 option tests; 160 total green; ruff clean |
 | T5 client: transport | todo | |
 | T6 client: read path | todo | |
 | T7 client: write path | todo | |
@@ -162,6 +162,55 @@ value is unknown must report unknown rather than quietly claim to be off.
 **Deferred deliberately.** The design lists `source_options`, `sound_mode_options` and
 `dirac_slot_options` under `models.py`. They consume collections the mirror builds, so they
 land with T4 rather than being designed here against a data shape that does not exist yet.
+
+### T4 — `mso.py` and `options.py`
+
+The mirror is a projection: ~30 tracked scalar leaves plus three collections (`inputs`,
+`dirac_slots`, `upmix_visible`). Classification happens before any allocation, which is what
+makes the `/status/raw` blob free — a dict lookup and at most three anchored regex matches.
+
+**Container re-derivation is table-driven.** `_apply_container` walks `TRACKED_PATHS` for
+entries beneath the prefix and resolves each relative pointer inside the value. There is no
+per-container unpacking to drift, which matters because all eight subtrees behave identically.
+
+**Absent stays unspecified.** A container replace only assigns leaves the value actually
+mentions. The `/inputs` sample in `wire_samples.json` names three inputs out of twenty-one, and
+`test_absent_keys_are_unspecified_not_cleared` proves the other eighteen survive. The single
+exception is `apply_document`, which is a census.
+
+**`_assign` compares before storing, and treats a never-seen field as `None`.** So setting an
+absent field to `None` on the first document is not a change — otherwise every entity for every
+field this firmware lacks would be woken on connect, across five units and ~50 panels.
+
+**Codec-mismatch reporting lives here, not in `models.py`.** "Report once" is state, and a
+warn-once flag on a module-level codec instance would suppress the warning across all five
+units after the first. `mirror.mismatches` is a per-instance tuple.
+
+#### `options.py` — a spec ambiguity found by a failing test
+
+Two tests I wrote in the same file contradicted each other about what a **missing** `homevis`
+means: one expected unmentioned modes to be hidden, the other expected them shown. Both could
+not hold.
+
+Resolved to **absent means visible**, as a single rule with no special case:
+
+- Firmware 1.13.x omits `homevis` entirely, and there is no way to distinguish "this firmware
+  does not report visibility" from "this mode is hidden".
+- Defaulting to hidden empties the whole dropdown on that firmware. Defaulting to visible costs
+  at worst one extra entry the user does not want.
+
+The failure mode is asymmetric, so the tolerant default wins. The test that assumed otherwise
+was the wrong one and now states the rule explicitly.
+
+Other option rules, each fixing a visible defect: canonical order rather than dict order (a unit
+reordering `/inputs` would otherwise reshuffle every dropdown on reconnect); the current value is
+always injected (Home Assistant renders a blank selector otherwise, and an input can be selected
+while invisible); and **every** member of a label collision is suffixed, not just the later one,
+which would reintroduce the order dependence.
+
+Dirac slots are labelled by wire index — `"0 - Reference"`, `"2 - Slot 2"` — so the number the
+user sees is the number `/cal/currentdiracslot` uses, duplicates are unique for free, and
+resolution is positional rather than by name.
 
 ### Patterns
 
