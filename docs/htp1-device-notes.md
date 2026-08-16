@@ -117,8 +117,22 @@ The document is not uniform, and 1.13.x is not 2.1.x.
   `Dolby Surround` and `5.1.2`, and pushed a listening-format change twice in twenty seconds.
   Blank signal readings when the unit reports itself off — it is honest, and it stops that churn
   from reaching anything downstream.
-- **Unread fields are padded with dashes** whose width follows the field: `--`, `---`, `-----`.
-  Test for *nothing but* dashes and spaces, so a real `1920x1080p-60` survives.
+- **A field can be blank in two different ways, and they mean different things.** Dashes as wide
+  as the field — `--`, `---`, `-----` — mean there is no signal at all. An **empty string** means
+  there is a signal and that attribute does not apply to it. Measured across five units: three
+  reported `HDRstatus: ""` while carrying a live 720p60Hz picture, one reported `HDR10`, and the
+  one with no input reported `--`.
+
+  Collapsing the two costs real information. `HDRstatus: ""` on a live picture *is* SDR, and
+  reporting it as unknown is a bug — it was reported as one. Guard the interpretation on whether
+  `VideoResolution` holds a real reading, so a firmware that leaves HDR blank on a dead input
+  does not produce a confident "SDR" about nothing.
+
+  Only HDR gets a name for its absence. One unit reported a live 1080p60Hz picture with an empty
+  `VideoBitDepth`, which is genuinely unknown rather than a value in disguise.
+
+  When testing for dashes, test for *nothing but* dashes and spaces, so a real `1920x1080p-60`
+  survives.
 - **Lip sync lives in two places and the unit pairs neither direction.** Writing `/cal/lipsync`
   alone moved it 0 → 120 while all 21 inputs stayed at `delay: 0`. Write `/cal/lipsync` and
   `/inputs/<current>/delay` together, in one message.
@@ -144,6 +158,7 @@ The document is not uniform, and 1.13.x is not 2.1.x.
 | Building the source list from dict order | JSON key order is not a contract; every dropdown reshuffles on reconnect |
 | Omitting the current input because it is invisible | The frontend dropdown renders blank |
 | Enumerating `/status` values | Real values include `5.2.2t` and `Native Dolby ATMOS` |
+| Treating an empty string as a spelling of the dashes | `HDRstatus: ""` on a live picture is SDR, reported as `unknown` |
 | Showing `/status` while the unit sleeps | A dark processor announces a soundtrack it stopped playing |
 | Writing `/cal/lipsync` alone | The unit's own display disagrees, and the value is lost on the next input switch |
 | Treating `error "bad-verb"` as fatal | Needless reconnect; the connection is fine |

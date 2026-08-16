@@ -293,6 +293,109 @@ async def test_a_field_of_dashes_is_not_a_reading(hass, config_entry, mock_clien
     assert hass.states.get("sensor.test_processor_video_resolution").state == STATE_UNKNOWN
 
 
+async def test_no_hdr_metadata_on_a_live_picture_is_sdr(hass, config_entry, mock_client):
+    """Reported as a bug: HDR read `unknown` on ordinary SDR content.
+
+    The unit writes three different things and the first pass conflated two of them. Measured
+    across five units: `HDR10` on one, `""` on three that were carrying a real 720p60Hz signal,
+    and `--` on the one with no signal at all. Empty is not "no reading" — it is the unit saying
+    this picture has no HDR metadata, which is exactly what SDR means.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops(
+        [
+            {"op": "replace", "path": "/videostat/VideoResolution", "value": "720p60Hz"},
+            {"op": "replace", "path": "/videostat/HDRstatus", "value": ""},
+        ]
+    )
+    _push(hass, mock_client, {"video_resolution", "hdr_status"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_hdr").state == "SDR"
+
+
+async def test_an_hdr_reading_is_passed_through_untouched(hass, config_entry, mock_client):
+    """`HDR10` today; the unit is free to say `HDR10+`, `Dolby Vision` or anything else.
+
+    Nothing is enumerated here for the same reason `5.2.2t` is not enumerated: an allow-list
+    written today is a bug on a firmware nobody has seen.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    for reading in ("HDR10", "HDR10+", "Dolby Vision", "HLG"):
+        mock_client.mirror.apply_ops(
+            [{"op": "replace", "path": "/videostat/HDRstatus", "value": reading}]
+        )
+        _push(hass, mock_client, {"hdr_status"})
+        await hass.async_block_till_done()
+        assert hass.states.get("sensor.test_processor_hdr").state == reading
+
+
+async def test_no_picture_at_all_is_not_reported_as_sdr(hass, config_entry, mock_client):
+    """Empty means SDR only when there is something to be SDR *about*.
+
+    Guarded on the resolution rather than trusting the empty string alone: a firmware that left
+    HDR blank on a dead input would otherwise have this sensor announcing SDR about nothing.
+    """
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops(
+        [
+            {"op": "replace", "path": "/videostat/VideoResolution", "value": "-----"},
+            {"op": "replace", "path": "/videostat/HDRstatus", "value": ""},
+        ]
+    )
+    _push(hass, mock_client, {"video_resolution", "hdr_status"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_hdr").state == STATE_UNKNOWN
+
+
+async def test_dashes_in_hdr_are_still_no_reading(hass, config_entry, mock_client):
+    """The no-signal spelling keeps its old meaning; only the empty case changed."""
+    await _setup(hass, config_entry, mock_client)
+
+    mock_client.mirror.apply_ops([{"op": "replace", "path": "/videostat/HDRstatus", "value": "--"}])
+    _push(hass, mock_client, {"hdr_status"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.test_processor_hdr").state == STATE_UNKNOWN
+
+
+async def test_other_video_fields_do_not_invent_a_value(hass, config_entry, mock_client):
+    """Only HDR names its own absence.
+
+    One unit reported a live 1080p60Hz picture with an empty `VideoBitDepth`. That is genuinely
+    unknown — it has told us nothing about bit depth — and must not become a made-up reading.
+
+    Colour space is disabled by default, so the reload has to happen inside the patch — enabling
+    a registry entry after setup does not put the entity in the state machine, and the assertion
+    would pass by looking at nothing.
+    """
+    with patch(PATCH_CLIENT, return_value=mock_client):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        er.async_get(hass).async_update_entity(
+            "sensor.test_processor_colour_space", disabled_by=None
+        )
+        await hass.config_entries.async_reload(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+        mock_client.mirror.apply_ops(
+            [
+                {"op": "replace", "path": "/videostat/VideoResolution", "value": "1080p60Hz"},
+                {"op": "replace", "path": "/videostat/VideoColorSpace", "value": ""},
+            ]
+        )
+        _push(hass, mock_client, {"video_resolution", "video_color_space"})
+        await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.test_processor_colour_space")
+    assert state is not None, "the entity must exist, or this test asserts nothing"
+    assert state.state == STATE_UNKNOWN
+
+
 async def test_a_real_value_containing_a_dash_survives(hass, config_entry, mock_client):
     """The rule is *nothing but* dashes. Resolutions and frame rates use them legitimately."""
     await _setup(hass, config_entry, mock_client)

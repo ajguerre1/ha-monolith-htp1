@@ -38,6 +38,21 @@ class Htp1SensorDescription(SensorEntityDescription):
     """A reading, named by the mirror field it shows."""
 
     field: str
+    # What an **empty** reading means, when a video signal is present.
+    #
+    # The unit writes three different things, and only two of them were noticed at first:
+    #
+    #   "HDR10"   an actual reading
+    #   ""        there is a signal, and this attribute does not apply to it
+    #   "-----"   there is no signal at all, padded to the field's width
+    #
+    # For most fields the middle case really is unknown — a unit reporting a signal but no
+    # `VideoBitDepth` has told us nothing about bit depth. For HDR it is the answer: a picture
+    # that carries no HDR metadata is SDR, and saying so is the whole point of the sensor.
+    #
+    # Left None everywhere else on purpose. Inventing a value for a field the unit declined to
+    # report would be guessing, and this is the one place where the absence has a name.
+    empty_means: str | None = None
 
 
 SENSORS: tuple[Htp1SensorDescription, ...] = (
@@ -102,6 +117,10 @@ SENSORS: tuple[Htp1SensorDescription, ...] = (
         translation_key="hdr_status",
         field="hdr_status",
         entity_category=EntityCategory.DIAGNOSTIC,
+        # A picture with no HDR metadata is SDR. Measured on five units: three showed `""`
+        # here while carrying a real 720p60Hz signal, one showed `HDR10`, and the one with no
+        # signal at all showed `--`.
+        empty_means="SDR",
     ),
     Htp1SensorDescription(
         key="video_color_space",
@@ -151,15 +170,31 @@ class Htp1Sensor(Htp1Entity, SensorEntity):
         field rather than the meaning — `--`, `---`, `-----`. Only-dashes is not a reading.
         The test is deliberately "nothing but dashes and spaces" rather than "contains a dash",
         so a real value like `1920x1080p-60` still reports itself.
+
+        An **empty** string is a third thing, and treating it as a fourth spelling of the second
+        was a defect: it means the unit has a signal but this attribute does not apply to it.
+        For most fields that is still unknown. For HDR it is SDR — see `empty_means`.
         """
         # `is False` and not a falsy test: a firmware that never reports power must not blank
         # every sensor it does report.
         if self.coordinator.optimistic("/powerIsOn") is False:
             return None
         value = self.coordinator.mirror.get(self.entity_description.field)
-        if isinstance(value, str) and not value.strip(" -"):
-            return None
-        return value
+        if not isinstance(value, str) or value.strip(" -"):
+            return value
+        if value == "" and self.entity_description.empty_means and self._video_signal_present():
+            return self.entity_description.empty_means
+        return None
+
+    def _video_signal_present(self) -> bool:
+        """Is the unit seeing a picture at all?
+
+        Guarded on the resolution rather than trusting `""` on its own. Empty was only ever
+        observed alongside a live signal, but a firmware that reported it on a dead input would
+        otherwise make this sensor announce SDR about nothing.
+        """
+        resolution = self.coordinator.mirror.get("video_resolution")
+        return isinstance(resolution, str) and bool(resolution.strip(" -"))
 
     def _state_snapshot(self) -> tuple:
         return (*super()._state_snapshot(), self.native_value)
