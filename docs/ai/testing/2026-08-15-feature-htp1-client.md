@@ -253,12 +253,36 @@ Driven by an injected fake transport and a controllable clock; no socket.
 - [ ] `test_a_deliberate_refresh_restores_the_budget` — connect, reconcile, manual refresh
       (AC-09)
 - [ ] `test_the_queue_does_not_survive_a_disconnect` (AC-10)
-- [ ] `test_handshake_timeout_fires_when_the_socket_never_upgrades` (AC-01)
-- [ ] `test_backoff_ladder_and_jitter_bounds` — 2/4/8/16/30/60, each within ±20 % (AC-11)
-- [ ] `test_the_ladder_resets_on_a_successful_handshake`
-- [ ] `test_two_clients_do_not_reconnect_in_lockstep` — different seeds diverge (AC-11)
-- [ ] `test_module_never_calls_random_seed` — source-level assertion; a library that seeds the
-      global RNG breaks every other integration (AC-11)
+**T5 transport — complete.** 22 tests. Names as shipped:
+
+- [x] `test_connecting_asks_for_the_document_and_loads_it`
+- [x] `test_the_url_is_the_controller_endpoint_on_port_eighty`
+- [x] `test_the_heartbeat_is_configured_on_the_socket`
+- [x] `test_a_refused_connection_raises_rather_than_retrying`
+- [x] `test_a_socket_that_never_upgrades_times_out` (AC-01) — the Control4 Critical defect,
+      reproduced against a connection that accepts and never upgrades
+- [x] `test_the_shipped_connect_timeout_is_fifteen_seconds` — tests use 0.02 s; the default
+      must stay the measured one
+- [x] `test_a_connection_that_drops_before_the_document_raises`
+- [x] `test_start_makes_one_attempt_and_raises` — exactly one `ws_connect` call
+- [x] `test_the_reconnect_ladder_only_starts_after_the_first_document`
+- [x] `test_stop_is_idempotent`, `test_stop_before_start_is_harmless`
+- [x] `test_stopping_closes_the_socket`
+- [x] `test_stop_leaves_no_task_running` — a supervisor outliving the entry would keep
+      reconnecting to a removed device
+- [x] `test_a_dropped_connection_is_re_established_and_re_read` — and `getmso` is re-sent,
+      because state after a gap cannot be assumed unchanged
+- [x] `test_the_backoff_ladder_climbs_and_caps` — 2/4/8/16/30/60/60/60, each within ±20 %
+      (AC-11)
+- [x] `test_jitter_actually_varies_the_delay`
+- [x] `test_two_clients_do_not_reconnect_in_lockstep` (AC-11)
+- [x] `test_the_same_seed_is_reproducible`
+- [x] `test_the_ladder_resets_after_a_successful_connection`
+- [x] `test_the_module_never_seeds_the_global_random_generator` (AC-11) — **by AST**, not
+      substring: the module's own docstring contains the words `random.seed()` as a warning
+- [x] `test_the_call_detector_actually_detects` — proves that guard can fail
+- [x] `test_the_client_does_not_touch_module_level_random` — exercises the real generator and
+      shows global state is unmoved
 - [ ] `test_the_client_survives_everything_the_unit_can_say` — `error`, bare JSON, unknown
       verbs, empty frames (AC-16)
 - [ ] `test_stop_is_idempotent_and_cancels_every_timer`

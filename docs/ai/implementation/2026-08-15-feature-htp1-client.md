@@ -17,7 +17,7 @@ in the planning doc.
 | T2 `protocol.py` | **done** | 34 protocol tests + 2 package-hygiene tests; 56 total green; ruff clean |
 | T3 `models.py` | **done** | 47 tests; 103 total green. A failing test found a floating-point tie defect — see below |
 | T4 `mso.py` + `options.py` | **done** | 37 mirror tests + 20 option tests; 160 total green; ruff clean |
-| T5 client: transport | todo | |
+| T5 client: transport | **done** | 22 tests; 182 total green; slowest test 0.04 s. Two API warts flagged for review before T6/T7 build on it |
 | T6 client: read path | todo | |
 | T7 client: write path | todo | |
 | T8 fake device | todo | |
@@ -211,6 +211,45 @@ which would reintroduce the order dependence.
 Dirac slots are labelled by wire index — `"0 - Reference"`, `"2 - Slot 2"` — so the number the
 user sees is the number `/cal/currentdiracslot` uses, duplicates are unique for free, and
 resolution is positional rather than by name.
+
+### T5 — `client.py`, transport half
+
+The first module with a socket, a task and a clock. Tested through an injected fake session at
+the `ws_connect` seam — the same seam Home Assistant's managed session plugs into — rather than
+by mocking aiohttp internals. Nothing sleeps: backoff delays go to an injected recorder, and the
+connect-timeout test uses a 0.02 s deadline while `DEFAULT_CONNECT_TIMEOUT` stays 15 s with its
+own test. The whole transport suite runs in 0.08 s.
+
+**The connect timeout spans the handshake, not just the TCP connect.** `_HangingConnection` in
+`tests/fakes.py` reproduces the exact Control4 defect: a connection that is accepted and never
+upgraded. Without the deadline nothing internal can leave the connecting state.
+
+**`async_start` makes one attempt.** On failure it tears down and raises, having started no
+ladder — `test_start_makes_one_attempt_and_raises` asserts exactly one `ws_connect` call. The
+supervisor, and therefore indefinite reconnection, begins only after a first document.
+
+**A reconnect re-sends `getmso`.** State after a gap cannot be assumed unchanged; the front
+panel may have moved things while the link was down.
+
+#### Two warts worth a decision before T6 builds on this
+
+1. **`note_failure()` and `backoff_schedule()` are public because tests needed them.** Both are
+   reasonable operations, but neither has a production caller today, and API shaped by tests
+   tends to stay that way.
+2. **`backoff_schedule()` consumes the client's RNG.** It advances a *local* index copy but
+   draws from `self._rng`, so calling it perturbs the delays a subsequent reconnect will use.
+   Harmless — jitter is jitter — but it means a "preview" method has a side effect, which is
+   the kind of thing that is fine until someone calls it in a diagnostics dump.
+
+Neither is a defect today. Both are cheap to change now and awkward to change once the write
+path depends on the surface.
+
+#### A repeat of an earlier mistake, caught by its own test
+
+`test_the_module_never_seeds_the_global_random_generator` first failed — on the module's own
+docstring, which contains the words `random.seed()` as a warning. Exactly the false positive
+the AST approach was introduced for in T2, made again with a substring check. Now by AST, with
+`test_the_call_detector_actually_detects` proving the detector can fail.
 
 ### Patterns
 
