@@ -24,8 +24,13 @@ from .const import DOMAIN, MANUFACTURER, MODEL, SETUP_TIMEOUT
 from .coordinator import Htp1Coordinator
 from .htp1.client import Htp1Client, Htp1Error
 
-# M3 adds the entity platforms; setup and the device exist without them.
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [
+    Platform.MEDIA_PLAYER,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 
 @dataclass

@@ -59,5 +59,79 @@
         "do_nothing": "Do nothing"
       }
     }
+  },
+  "entity": {
+    "select": {
+      "dirac_slot": {
+        "name": "Dirac slot"
+      },
+      "dirac_state": {
+        "name": "Dirac",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "bypass": "Bypass"
+        }
+      },
+      "night_mode": {
+        "name": "Night mode",
+        "state": {
+          "off": "Off",
+          "auto": "Auto",
+          "on": "On"
+        }
+      }
+    },
+    "switch": {
+      "loudness": {
+        "name": "Loudness"
+      },
+      "bass_enhance": {
+        "name": "Bass enhancement"
+      },
+      "tone_control": {
+        "name": "Tone control"
+      }
+    },
+    "number": {
+      "dialog_enhancement": {
+        "name": "Dialogue enhancement"
+      },
+      "lip_sync": {
+        "name": "Lip sync"
+      }
+    },
+    "sensor": {
+      "surround_mode": {
+        "name": "Surround mode"
+      },
+      "source_program": {
+        "name": "Source format"
+      },
+      "listening_format": {
+        "name": "Listening format"
+      },
+      "program_format": {
+        "name": "Program format"
+      },
+      "input_sample_rate": {
+        "name": "Input sample rate"
+      },
+      "output_sample_rate": {
+        "name": "Output sample rate"
+      },
+      "dirac_status": {
+        "name": "Dirac status"
+      },
+      "video_resolution": {
+        "name": "Video resolution"
+      },
+      "hdr_status": {
+        "name": "HDR"
+      },
+      "video_color_space": {
+        "name": "Colour space"
+      }
+    }
   }
 }
