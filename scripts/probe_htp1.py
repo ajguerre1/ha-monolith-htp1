@@ -34,6 +34,33 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+
+def _stub_parent_packages() -> None:
+    """Let `htp1` be imported without executing the integration's `__init__.py`.
+
+    That file imports Home Assistant, which cannot be imported on the Windows machine this tool
+    is most often run from. The vendored client deliberately has no Home Assistant imports, so
+    stubbing the two parent packages reaches it directly — the same trick `tests/conftest.py`
+    uses, and for the same reason.
+
+    Without this the probe stopped working the moment the integration layer landed, which is a
+    poor property for the one tool that is safe to point at live hardware.
+    """
+    import types
+
+    package = REPO_ROOT / "custom_components"
+    for name, path in (
+        ("custom_components", package),
+        ("custom_components.ha_monolith_htp1", package / "ha_monolith_htp1"),
+    ):
+        if name not in sys.modules:
+            stub = types.ModuleType(name)
+            stub.__path__ = [str(path)]
+            sys.modules[name] = stub
+
+
+_stub_parent_packages()
+
 import aiohttp  # noqa: E402
 
 from custom_components.ha_monolith_htp1.htp1 import protocol  # noqa: E402

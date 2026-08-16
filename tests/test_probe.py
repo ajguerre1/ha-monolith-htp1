@@ -35,6 +35,51 @@ def test_the_probe_exists():
     assert PROBE.is_file(), "the probe is how the hardware questions get answered"
 
 
+def test_the_probe_imports_without_home_assistant():
+    """The probe must run on a machine where Home Assistant cannot be imported at all.
+
+    It broke exactly that way once: the integration package started importing Home Assistant in
+    M2, and the probe imports the vendored client *through* that package, so the one tool safe
+    to point at live hardware stopped working on the machine it is run from. It now stubs the
+    parent packages, and this proves it — in a subprocess with `homeassistant` forced to fail,
+    so the check is real on CI too, where the module is installed.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    program = textwrap.dedent(
+        """
+        import sys
+
+        BLOCKED = "homeassistant"
+
+        class Blocker:
+            def find_spec(self, name, path=None, target=None):
+                if name == BLOCKED or name.startswith(BLOCKED + "."):
+                    raise ImportError("blocked for this test")
+                return None
+
+        sys.meta_path.insert(0, Blocker())
+        sys.path.insert(0, "scripts")
+        import probe_htp1
+        assert probe_htp1.summarise({"cal": {}, "versions": {}})
+        print("ok")
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, (
+        f"the probe cannot import without Home Assistant:\n{result.stderr}"
+    )
+    assert "ok" in result.stdout
+
+
 def test_the_probe_never_mentions_allow_writes():
     """AC-21. Stronger than passing False: a script that cannot say the word cannot enable it."""
     offenders = [
