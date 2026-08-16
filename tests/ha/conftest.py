@@ -68,7 +68,15 @@ def mock_client(mirror) -> MagicMock:
 
     def add_listener(callback):
         listeners.append(callback)
-        return lambda: listeners.remove(callback)
+
+        def unsubscribe():
+            # Tolerant, because the real client's is: `test_unsubscribing_twice_is_harmless`
+            # pins that. A stricter mock raises during teardown and fails tests that had
+            # already passed, which is a fake being wrong about the thing it stands in for.
+            if callback in listeners:
+                listeners.remove(callback)
+
+        return unsubscribe
 
     client.add_listener.side_effect = add_listener
     return client

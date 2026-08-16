@@ -383,16 +383,27 @@ class MsoMirror:
         return self._inputs != before
 
     def _merge_input(self, key: str, patch: dict) -> bool:
-        existing = self._inputs.get(key, InputInfo(key=key))
+        """Store one input, and report whether it moved.
+
+        The entry is stored even when it equals a default-constructed one. Comparing against
+        that default and returning early looked like the same change-gating the scalars use,
+        and silently dropped every input with a blank label that was also invisible — twelve of
+        twenty-one on a real unit. Nothing user-facing broke, because an absent key and
+        `visible: false` produce the same source list, but `len(mirror.inputs)` was wrong and
+        any future consumer counting inputs would have inherited it.
+
+        "Not present" and "present with defaults" are different states, so the comparison is
+        against `existing`, which is None on first insert.
+        """
+        existing = self._inputs.get(key)
+        base = existing or InputInfo(key=key)
         updated = InputInfo(
             key=key,
-            label=patch.get("label", existing.label) or "",
-            visible=bool(patch.get("visible", existing.visible)),
+            label=patch.get("label", base.label) or "",
+            visible=bool(patch.get("visible", base.visible)),
         )
-        if updated == existing:
-            return False
         self._inputs[key] = updated
-        return True
+        return updated != existing
 
     def _rebuild_slots(self, value: Any) -> bool:
         """Always six rows, positionally indexed, whatever the unit sent.

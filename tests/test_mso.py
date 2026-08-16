@@ -398,6 +398,20 @@ def test_a_missing_slot_array_still_yields_six_rows(mso_sparse):
 # --------------------------------------------------------------------------------------
 
 
+def test_every_input_the_document_lists_is_kept(modern, mso_modern):
+    """Including the ones with a blank label that are also invisible.
+
+    Twelve of twenty-one were being dropped: the merge compared each new entry against a
+    default-constructed one and returned early when they matched, which is the same shape as
+    the scalar change-gating and quietly wrong here. "Not present" and "present with defaults"
+    are different states. Found by a diagnostics test asserting the input count.
+    """
+    assert set(modern.inputs) == set(mso_modern["inputs"])
+    assert len(modern.inputs) == 21
+    assert modern.inputs["usb"].visible is False
+    assert modern.inputs["usb"].label == ""
+
+
 def test_inputs_are_projected_with_labels_and_visibility(modern):
     assert modern.inputs["h1"].label == "Media Player"
     assert modern.inputs["h1"].visible is True
