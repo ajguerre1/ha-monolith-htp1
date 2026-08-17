@@ -17,7 +17,13 @@ Assistant entity roughly 100 ms later. Nothing polls.
 
 ## Transport
 
-`ws://<host>/ws/controller`, port 80. **No auth, no TLS, no REST API, no mDNS, no SSDP.**
+`ws://<host>/ws/controller`, port 80. **No auth, no TLS, no REST API, no SSDP.**
+
+**mDNS depends on firmware.** 2.1.2 added an advertisement and it is real: every unit here
+answers as `_htp1._tcp.local.` on port 80, with `model`, `name` and `swVer` in the TXT record,
+and an instance name like `AVP-Formal-Living-332c15`. Earlier firmware advertises nothing, which
+is why older notes on this device — including this file's own, until it was checked — say there
+is no mDNS at all. Verify against the firmware in front of you.
 
 Text frames of `verb[space]JSON`, **split on the first space only** — the payload contains
 spaces.
@@ -103,9 +109,19 @@ fractions.
 
 The document is not uniform, and 1.13.x is not 2.1.x.
 
-- **No MAC address anywhere.** `/network/eth0` carries `dhcp`, `addr`, `mask`, `gw` and nothing
-  else, and the last three are empty strings. The only `*mac*` matches are `/inputs/*/macro`.
-  **DHCP self-heal is therefore not buildable** — do not imply one; recommend a reservation.
+- **No MAC address anywhere in the document.** `/network/eth0` carries `dhcp`, `addr`, `mask`,
+  `gw` and nothing else, and the last three are empty strings. The only `*mac*` matches are
+  `/inputs/*/macro`. So `dhcp:` discovery is not buildable, since it needs a MAC to register a
+  device connection.
+
+  **That does not mean a moved unit cannot be found again**, and concluding so here was an
+  error. On 2.1.2 the mDNS announcement re-appears at the new address and the entry's stored
+  host can be rewritten from it. The right question was never "is there a MAC" but "is there any
+  identifier that survives an address change" — and the mDNS instance suffix is one, six hex
+  digits that appear nowhere in the document.
+
+  Worth knowing when choosing a key: the unit's own `SerialNumber` is only **three characters**
+  (`314`, `332`), which is distinct within one installation but weak in general.
 - **`/eq/tc` is a bool while `/loudness` and `/bassenhance` are `"off"`/`"on"` strings.** Declare
   a codec per path and warn once on a mismatch rather than guessing from a neighbour.
 - **1.13.x has no `videostat` block at all.** A missing path must disable the feature that needs

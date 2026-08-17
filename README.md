@@ -69,23 +69,30 @@ You can change what "turn off" means per entry in the integration's options, inc
 1. In HACS, add `https://github.com/ajguerre1/ha-monolith-htp1` as a custom repository of
    category **Integration**.
 2. Install **Monolith HTP-1** and restart Home Assistant.
-3. **Settings → Devices & services → Add integration → Monolith HTP-1**, then enter the
-   processor's address. Repeat once per unit.
+3. Processors on firmware 2.1.2+ appear on their own under **Settings → Devices & services**;
+   click **Configure**. Otherwise **Add integration → Monolith HTP-1** and enter the address,
+   once per unit.
 
 <img src="docs/images/config-flow.png" alt="The Add a Monolith HTP-1 dialog, with a single
 Address field" width="520">
 
 The address field accepts a pasted `http://` or `ws://` URL as well as a bare host.
 
-### Give each unit a fixed address
+### Discovery
 
-**There is no discovery.** The HTP-1 advertises no mDNS or SSDP service, and its status
-document carries no MAC address anywhere — so Home Assistant cannot follow a unit that DHCP
-moves, and no amount of cleverness in the integration can change that. Give each processor a
-DHCP reservation or a static address.
+Processors running firmware **2.1.2 or newer announce themselves** over mDNS as
+`_htp1._tcp.local.`, and Home Assistant offers them for one-click setup. A unit that is already
+configured is not offered again — its stored address is corrected instead, so a processor that
+moves in DHCP is picked back up on its own.
 
-If a unit does move, **Settings → Devices & services → Monolith HTP-1 → Reconfigure** updates
-the address. The unit is identified by serial number, so pointing an entry at a *different*
+Older firmware advertises nothing, so enter the address by hand. Do the same if mDNS does not
+cross between your Home Assistant and your processors, which is common on segmented networks.
+
+A static address or DHCP reservation is still worth having: it costs nothing and does not
+depend on multicast reaching anywhere.
+
+If a unit does move and is not found, **Settings → Devices & services → Monolith HTP-1 →
+Reconfigure** updates the address. The unit is identified by serial number, so pointing an entry at a *different*
 processor is refused rather than silently re-targeting every entity in the room.
 
 ## Options
@@ -119,7 +126,9 @@ unit on hand runs it.
 
 ## Known limitations
 
-- **No discovery, and no DHCP self-heal.** See above; the document carries no MAC.
+- **Discovery needs firmware 2.1.2 or newer.** Older units advertise nothing and must be added
+  by hand. `dhcp:` discovery is not possible on any firmware — the status document carries no
+  MAC address anywhere — but zeroconf covers the same ground.
 - **No `media_player` transport controls.** The HTP-1 is a pre-processor. It does not play
   anything, and inferring "playing" from a decoded format would claim more than it tells us.
 - **Status sensors are free text.** Real values include `5.2.2t` and `Native Dolby ATMOS`; any

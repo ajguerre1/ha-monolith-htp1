@@ -10,9 +10,14 @@ Two rules here were learned the hard way on a sibling integration and are easy t
    serves its web UI on the same port, so anything that answers on 80 would pass a connect-only
    check.
 
-There is no discovery step. HW-03 measured no MAC anywhere in the document, so Home Assistant's
-DHCP tracking cannot follow a unit across an address change — the README recommends a
-reservation rather than implying a self-heal that cannot fire.
+Discovery is by **zeroconf**, not DHCP. The unit advertises `_htp1._tcp.local.` from firmware
+2.1.2 onward; older firmware advertises nothing, so the manual step stays.
+
+The distinction matters and it was got wrong once here. HW-03 found no MAC anywhere in the
+document, which rules out `dhcp:` discovery — that needs a MAC to register a device connection.
+It does **not** rule out following a unit across an address change: a moved unit re-announces
+itself over mDNS, and `_abort_if_unique_id_configured(updates=...)` rewrites the stored host.
+The conclusion drawn from HW-03 was about the wrong mechanism.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TextSelector,
 )
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .const import (
     CONF_MAX_VOLUME_DB,
@@ -62,11 +68,63 @@ class Htp1ConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    _discovered_host: str
+    _discovered_identity: _Identity
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         return await self._address_step("user", user_input)
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None):
         return await self._address_step("reconfigure", user_input)
+
+    async def async_step_zeroconf(self, discovery_info: ZeroconfServiceInfo):
+        """A unit announced itself as `_htp1._tcp.local.`.
+
+        The announcement is not trusted for identity. Its TXT record carries a name and a model,
+        and the instance name carries a stable per-unit suffix, but the entry is keyed on the
+        serial read from the unit itself so that a discovered unit and a hand-added one resolve
+        to the same entry rather than to two.
+
+        A unit that is already configured is not offered again; its stored address is corrected
+        instead. That is the address self-healing this integration previously said it could not
+        do, and the earlier claim was about `dhcp:` discovery rather than this.
+        """
+        host = discovery_info.host
+        try:
+            identity = await _read_identity(self.hass, host)
+        except Htp1Error:
+            # Something answered on the announced address but is not an HTP-1, or is not ready.
+            # Silently dropping the discovery is right: the user did not ask for anything, so
+            # there is nobody to show an error to.
+            return self.async_abort(reason="cannot_connect")
+
+        await self.async_set_unique_id(identity.serial or f"host-{host}")
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+
+        self._discovered_host = host
+        self._discovered_identity = identity
+        # Shown in the discovery card, and in the confirmation dialog's title.
+        self.context["title_placeholders"] = {"name": identity.title(host)}
+        return await self.async_step_zeroconf_confirm()
+
+    async def async_step_zeroconf_confirm(self, user_input: dict[str, Any] | None = None):
+        """One click, but still a click.
+
+        Adding a processor without asking would put every room with one under Home Assistant's
+        control the moment the integration is installed.
+        """
+        if user_input is not None:
+            return self.async_create_entry(
+                title=self._discovered_identity.title(self._discovered_host),
+                data={CONF_HOST: self._discovered_host},
+            )
+        return self.async_show_form(
+            step_id="zeroconf_confirm",
+            description_placeholders={
+                "name": self._discovered_identity.title(self._discovered_host),
+                "host": self._discovered_host,
+            },
+        )
 
     async def _address_step(self, step_id: str, user_input: dict[str, Any] | None):
         errors: dict[str, str] = {}

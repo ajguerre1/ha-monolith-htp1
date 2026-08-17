@@ -14,5 +14,8 @@
     "custom_components.ha_monolith_htp1"
   ],
   "requirements": [],
-  "version": "0.1.4"
+  "version": "0.2.0",
+  "zeroconf": [
+    "_htp1._tcp.local."
+  ]
 }

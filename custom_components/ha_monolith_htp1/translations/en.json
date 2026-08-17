@@ -3,13 +3,17 @@
     "step": {
       "user": {
         "title": "Add a Monolith HTP-1",
-        "description": "Enter the processor's address. It has no username or password — the control interface is unauthenticated, so anyone who can reach it on the network can control it.\n\nThere is no discovery: the HTP-1 advertises no mDNS or SSDP service, and its status document carries no MAC address, so Home Assistant cannot follow it if DHCP moves it. Give each unit a reservation or a static address.",
+        "description": "Enter the processor's address. It has no username or password — the control interface is unauthenticated, so anyone who can reach it on the network can control it.\n\nProcessors running firmware 2.1.2 or newer announce themselves and are found automatically; enter an address by hand for older firmware, or if the announcement does not cross your network.",
         "data": {
           "host": "Address"
         },
         "data_description": {
           "host": "Hostname or IP address, for example 192.168.1.50. A pasted http:// URL is accepted too."
         }
+      },
+      "zeroconf_confirm": {
+        "title": "Add {name}",
+        "description": "This processor announced itself on the network at {host}.\n\nIt has no username or password — the control interface is unauthenticated, so anyone who can reach it on the network can control it.\n\nAdding it creates a media player plus controls for Dirac, night mode, tone and lip sync. Note that \"turn off\" puts the processor to sleep rather than shutting it down, so Home Assistant can still reach it."
       },
       "reconfigure": {
         "title": "Change the address",
@@ -32,7 +36,8 @@
     "abort": {
       "already_configured": "That processor is already set up.",
       "reconfigure_successful": "The address was updated.",
-      "wrong_device": "That address belongs to a different processor. To add it, use Add integration instead."
+      "wrong_device": "That address belongs to a different processor. To add it, use Add integration instead.",
+      "cannot_connect": "That processor announced itself but did not answer when Home Assistant read from it. It may still be starting up; it will be offered again the next time it announces."
     }
   },
   "options": {
